@@ -539,6 +539,10 @@ onMounted(() => {
 	white-space: nowrap;
 }
 
+.links-table tbody tr:hover td {
+	background: color-mix(in srgb, var(--bg-tertiary) 65%, transparent);
+}
+
 .links-table td.col-actions {
 	display: flex;
 	gap: 0.5rem;
