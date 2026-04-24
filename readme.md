@@ -25,7 +25,9 @@ Minimal self-hosted link redirector with admin UI, stats, SQLite storage and API
 - [Support](#support)
 - [MIT License](#mit-license)
 
----
+## How the admin panel looks
+
+![Relinky Admin UI](./relinky.png)
 
 ## Architecture overview
 
