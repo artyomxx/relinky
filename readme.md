@@ -201,13 +201,14 @@ flowchart LR
 
 Checklist:
 
-1. Build pack: Docker Compose, file [`docker-compose.coolify.yml`](./docker-compose.coolify.yml)
-2. Provide `ADMIN_PASSWORD_HASH` or `ADMIN_PASSWORD_HASH_B64`
-3. Ensure the persistent storage for `./db` is attached to both services (should happen automatically)
-4. Setup admin and redirect domains in **General -> Domains**:
+1. Create an app from a public Github repo or your private cloned one
+2. Build pack: Docker Compose, file [`docker-compose.coolify.yml`](./docker-compose.coolify.yml). Note that by default Coolify offers `.yaml` extension, so change the whole file name.
+3. Provide `ADMIN_PASSWORD_HASH_B64` — Base64-encoded hash. `ADMIN_PASSWORD_HASH` doesn't work with current version of Coolify because `$` symbols are mangld in Coolify's environment variables.
+4. Ensure the persistent storage for `./db` is attached to both services (should happen automatically)
+5. Setup admin and redirect domains in **General -> Domains**:
    - Admin service: one admin hostname, for example `https://admin.example.com:8081`
    - Redirect service: one or many redirect hostnames, for example `https://link.example.com:8082, https://dl.example.com:8082`
-   - Important: keep in mind Coolify expects full links with protocols and ports instead of bare domains.
+   - Important: keep in mind Coolify expects full links with protocols and ports like shown above, don't enter only domains.
 
 ---
 
