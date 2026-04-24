@@ -37,12 +37,14 @@ function escapeHtmlAttr(s) {
  * HTTP 3xx Location with a #fragment is not applied by browsers when following redirects,
  * so the address bar would drop the hash. Client-side navigation preserves it.
  */
-function sendClientRedirectWithFragment(res, targetUrl) {
+function sendClientRedirectWithFragment(res, targetUrl, referrerPolicy = 'no-referrer') {
 	const jsLiteral = JSON.stringify(targetUrl)
 	const href = escapeHtmlAttr(targetUrl)
+	const metaReferrer = escapeHtmlAttr(referrerPolicy)
 	const body =
 		'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
 		'<meta name="color-scheme" content="light dark">' +
+		`<meta name="referrer" content="${metaReferrer}">` +
 		'<title>Redirecting…</title>' +
 		'<style>' +
 		'html{color-scheme:light dark}' +
@@ -51,7 +53,10 @@ function sendClientRedirectWithFragment(res, targetUrl) {
 		'</style>' +
 		`<script>location.replace(${jsLiteral})</script>` +
 		`</head><body><noscript><p><a href="${href}">Continue</a></p></noscript></body></html>`
-	res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+	res.writeHead(200, {
+		'Content-Type': 'text/html; charset=utf-8',
+		'Referrer-Policy': referrerPolicy
+	})
 	res.end(body)
 }
 
@@ -168,13 +173,15 @@ const server = createServer((req, res) => {
 		})
 
 		// Redirect (see sendClientRedirectWithFragment — Location #fragment is ignored by browsers)
+		const referrerPolicy = link.keep_referrer ? 'unsafe-url' : 'no-referrer'
 		if (finalUrl.includes('#')) {
-			sendClientRedirectWithFragment(res, finalUrl)
+			sendClientRedirectWithFragment(res, finalUrl, referrerPolicy)
 			return
 		}
 
 		res.writeHead(redirectCode, {
 			'Location': finalUrl,
+			'Referrer-Policy': referrerPolicy,
 			'Content-Type': 'text/plain'
 		})
 		res.end()

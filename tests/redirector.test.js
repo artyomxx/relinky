@@ -164,6 +164,7 @@ function redirectorRawGet({ host, path: reqPath }) {
 					resolve({
 						statusCode: res.statusCode,
 						location: res.headers.location,
+						referrerPolicy: res.headers['referrer-policy'],
 						body: Buffer.concat(chunks).toString()
 					})
 				})
@@ -287,6 +288,84 @@ test('redirector merges query string when keep_query_params is true', { concurre
 		assert.equal(res.statusCode, 303)
 		const u = new URL(res.location)
 		assert.equal(u.searchParams.get('src'), 'test')
+	} finally {
+		await cleanupDomain(token, domain)
+	}
+})
+
+test('redirector sets Referrer-Policy based on keep_referrer flag', { concurrency: false }, async () => {
+	const token = await adminLogin()
+	const domain = uniqueRedirectDomain()
+	await createDomain(token, domain)
+	try {
+		await createLink(token, {
+			domain,
+			slug: 'keep-ref',
+			url: 'https://example.org/keep-ref',
+			redirect_code: 302,
+			keep_referrer: true
+		})
+		await createLink(token, {
+			domain,
+			slug: 'no-ref',
+			url: 'https://example.org/no-ref',
+			redirect_code: 302,
+			keep_referrer: false
+		})
+
+		const keepRes = await waitForRedirectResponse(
+			domain,
+			'/keep-ref',
+			r => r.statusCode === 302 && r.location === 'https://example.org/keep-ref'
+		)
+		assert.equal(keepRes.referrerPolicy, 'unsafe-url')
+
+		const noRefRes = await waitForRedirectResponse(
+			domain,
+			'/no-ref',
+			r => r.statusCode === 302 && r.location === 'https://example.org/no-ref'
+		)
+		assert.equal(noRefRes.referrerPolicy, 'no-referrer')
+	} finally {
+		await cleanupDomain(token, domain)
+	}
+})
+
+test('fragment redirects include matching Referrer-Policy header and meta', { concurrency: false }, async () => {
+	const token = await adminLogin()
+	const domain = uniqueRedirectDomain()
+	await createDomain(token, domain)
+	try {
+		await createLink(token, {
+			domain,
+			slug: 'frag-keep',
+			url: 'https://example.org/path#frag',
+			redirect_code: 302,
+			keep_referrer: true
+		})
+		await createLink(token, {
+			domain,
+			slug: 'frag-no',
+			url: 'https://example.org/path#frag',
+			redirect_code: 302,
+			keep_referrer: false
+		})
+
+		const keepRes = await waitForRedirectResponse(
+			domain,
+			'/frag-keep',
+			r => r.statusCode === 200 && r.body.includes('location.replace(')
+		)
+		assert.equal(keepRes.referrerPolicy, 'unsafe-url')
+		assert.match(keepRes.body, /<meta name="referrer" content="unsafe-url">/)
+
+		const noRefRes = await waitForRedirectResponse(
+			domain,
+			'/frag-no',
+			r => r.statusCode === 200 && r.body.includes('location.replace(')
+		)
+		assert.equal(noRefRes.referrerPolicy, 'no-referrer')
+		assert.match(noRefRes.body, /<meta name="referrer" content="no-referrer">/)
 	} finally {
 		await cleanupDomain(token, domain)
 	}
