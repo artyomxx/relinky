@@ -1,0 +1,40 @@
+# Default: one container, admin 8081 + redirector 8082 (no TLS in the container).
+# Coolify (two Domains fields): use docker-compose.coolify.yml instead.
+# Self-hosted HTTPS + UI-driven redirect domains in one box:
+#   docker compose -f docker-compose.gateway.yml up -d
+
+name: relinky
+
+services:
+  relinky:
+    build: .
+    container_name: relinky
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${ADMIN_PORT:-8081}:8081"
+      - "${REDIRECTOR_PORT:-8082}:8082"
+    volumes:
+      - ./db:/app/db
+    environment:
+      # Set in project .env (single-quoted $6$ hash) or in Coolify / CI env — not unquoted in .env
+      # or Compose will corrupt the hash. Coolify does not use your repo .env unless you add it.
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?}
+      - ADMIN_IP=${ADMIN_IP:-0.0.0.0}
+      - ADMIN_PORT=${ADMIN_PORT:-8081}
+      - REDIRECTOR_IP=${REDIRECTOR_IP:-0.0.0.0}
+      - REDIRECTOR_PORT=${REDIRECTOR_PORT:-8082}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "Promise.all([fetch('http://127.0.0.1:8081/-healthcheck'),fetch('http://127.0.0.1:8082/-healthcheck')]).then(rs=>rs.every(r=>r.ok)?process.exit(0):process.exit(1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    restart: unless-stopped

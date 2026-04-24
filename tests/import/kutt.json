@@ -1,0 +1,58 @@
+[
+    {
+      "id": "ba867116-5dea-4da1-9d25-1656117d8fd1",
+      "address": "test-1",
+      "banned": false,
+      "created_at": "2026-04-23T09:00:19.351Z",
+      "updated_at": "2026-04-23T09:00:19.351Z",
+      "password": false,
+      "description": null,
+      "expire_in": null,
+      "target": "https://example.com/some-page/test/1?utm_source=example&utm_medium=test&utm_content=test-1&utm_campaign=example",
+      "visit_count": 29,
+      "domain": "link.example.com",
+      "link": "http://link.example.com/test-1"
+    },
+    {
+      "id": "61b516f0-ecd4-45b4-8852-dbdd6855bfc7",
+      "address": "test-2-long-slug-2026-04-24",
+      "banned": false,
+      "created_at": "2026-04-23T08:47:57.257Z",
+      "updated_at": "2026-04-23T08:47:57.257Z",
+      "password": false,
+      "description": null,
+      "expire_in": null,
+      "target": "https://example.com/some-page/test/2?utm_source=example&utm_medium=test&utm_content=test-2-long-slug-2026-04-24&utm_campaign=example",
+      "visit_count": 188,
+      "domain": "go.example.com",
+      "link": "http://go.example.com/test-2-long-slug-2026-04-24"
+    },
+    {
+      "id": "280f4797-73bb-440c-9635-68b110c73e65",
+      "address": "whatever",
+      "banned": false,
+      "created_at": "2026-04-23T08:24:56.067Z",
+      "updated_at": "2026-04-23T08:24:56.067Z",
+      "password": false,
+      "description": null,
+      "expire_in": null,
+      "target": "https://duckduckgo.com/?q=whatever",
+      "visit_count": 73,
+      "domain": "go.example.com",
+      "link": "http://go.example.com/whatever"
+    },
+    {
+      "id": "76296146-d99a-465e-8a72-6497ef0c197b",
+      "address": "funny-cat-video",
+      "banned": false,
+      "created_at": "2026-04-23T08:23:34.729Z",
+      "updated_at": "2026-04-23T08:23:34.729Z",
+      "password": false,
+      "description": null,
+      "expire_in": null,
+      "target": "https://duckduckgo.com/?q=funny-cat-video",
+      "visit_count": 74,
+      "domain": "v.example.com",
+      "link": "http://v.example.com/funny-cat-video"
+    }
+]

@@ -1,0 +1,60 @@
+# All-in-one image: Caddy on 80/443 proxies to Node (admin + redirector) on loopback.
+# Domains you add in the UI are merged into the Caddyfile and reloaded automatically.
+#
+# Usage:
+#   export ADMIN_PASSWORD_HASH=...
+#   export RELINKY_ADMIN_HOST=admin.example.com
+#   export ACME_EMAIL=you@example.com
+#   docker compose -f docker-compose.gateway.yml up -d
+#
+# Local HTTP-only (no TLS): set RELINKY_HTTP_ONLY=1 and map DNS or /etc/hosts to your machine.
+#
+# Ports (avoid binding host 80/443 if something else uses them):
+#   RELINKY_GATEWAY_HOST_HTTP / RELINKY_GATEWAY_HOST_HTTPS — published ports on the Docker host (default 80 / 443)
+#   RELINKY_CADDY_HTTP_PORT / RELINKY_CADDY_HTTPS_PORT — ports Caddy listens on inside the container (default 80 / 443)
+# Example host 9080 → container 9080 for HTTP-only testing:
+#   RELINKY_HTTP_ONLY=1 RELINKY_GATEWAY_HOST_HTTP=9080 RELINKY_CADDY_HTTP_PORT=9080
+#
+# "Bind for 0.0.0.0:443 failed: port is already allocated" → another app owns 443 (e.g. Coolify).
+# Set RELINKY_GATEWAY_HOST_HTTPS=8443 and RELINKY_CADDY_HTTPS_PORT=8443 (and matching HTTP if 80 is taken).
+
+name: relinky
+
+services:
+  relinky:
+    build: .
+    container_name: relinky-gateway
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${RELINKY_GATEWAY_HOST_HTTP:-80}:${RELINKY_CADDY_HTTP_PORT:-80}"
+      - "${RELINKY_GATEWAY_HOST_HTTPS:-443}:${RELINKY_CADDY_HTTPS_PORT:-443}"
+    volumes:
+      - ./db:/app/db
+    environment:
+      # Same as docker-compose.yml: set in .env (single-quoted) or host/Coolify env (paste full $6$…).
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?}
+      - RELINKY_USE_GATEWAY=1
+      - RELINKY_ADMIN_HOST=${RELINKY_ADMIN_HOST}
+      - ACME_EMAIL=${ACME_EMAIL:-}
+      - RELINKY_HTTP_ONLY=${RELINKY_HTTP_ONLY:-0}
+      - RELINKY_ACME_STAGING=${RELINKY_ACME_STAGING:-0}
+      - RELINKY_CADDY_HTTP_PORT=${RELINKY_CADDY_HTTP_PORT:-}
+      - RELINKY_CADDY_HTTPS_PORT=${RELINKY_CADDY_HTTPS_PORT:-}
+      - RELINKY_CADDY_TLS_INTERNAL=${RELINKY_CADDY_TLS_INTERNAL:-0}
+      - ADMIN_PORT=8081
+      - REDIRECTOR_PORT=8082
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "Promise.all([fetch('http://127.0.0.1:8081/-healthcheck'),fetch('http://127.0.0.1:8082/-healthcheck')]).then(rs=>rs.every(r=>r.ok)?process.exit(0):process.exit(1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped

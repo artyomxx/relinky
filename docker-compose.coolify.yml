@@ -1,0 +1,79 @@
+# Coolify / Traefik: two services (admin 8081 + redirector 8082), shared SQLite volume.
+# Compose file in Coolify: docker-compose.coolify.yml
+#
+# Coolify often hides Domains unless it sees published `ports` (not only `expose`) and/or
+# magic SERVICE_URL_* lines — both are set below. Service names use underscores so magic
+# variables like SERVICE_URL_RELINKY_ADMIN_8081 parse reliably.
+#
+# After deploy: Configuration → each service should list Domains / “Generate Domain”, e.g.
+#   relinky_admin:    https://admin.example.com:8081
+#   relinky_redirect: https://go.example.com:8082
+# If the UI still hides domains, use Raw Compose + Traefik labels (see Traefik Docker provider docs).
+#
+# Coolify shows per-service “Healthcheck” UI when each service defines `healthcheck:` below (Compose
+# healthchecks, not only Dockerfile HEALTHCHECK).
+
+name: relinky
+
+services:
+  relinky_admin:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./db:/app/db
+    environment:
+      # Set ADMIN_PASSWORD_HASH ($6$…) and/or ADMIN_PASSWORD_HASH_B64 (base64 of that string).
+      # Coolify can mangle `$` in “Literal” vars; use B64 only if logs show startsWith$6$=false.
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
+      - ADMIN_PASSWORD_HASH_B64=${ADMIN_PASSWORD_HASH_B64:-}
+      # Optional: ADMIN_LOGIN_DEBUG=1 in Coolify env — see readme “Configuration”
+      - ADMIN_IP=0.0.0.0
+      - ADMIN_PORT=8081
+      # Triggers Coolify URL/FQDN generation + proxy routing to 8081 (Git-based compose needs Coolify ≥ beta.411).
+      - SERVICE_URL_RELINKY_ADMIN_8081
+    entrypoint: ["/bin/sh", "-c", "node /app/app/shared/init-db.js && exec node /app/app/admin/backend/server.js"]
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8081/-healthcheck').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    restart: unless-stopped
+
+  relinky_redirect:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./db:/app/db
+    environment:
+      - REDIRECTOR_IP=0.0.0.0
+      - REDIRECTOR_PORT=8082
+      - SERVICE_URL_RELINKY_REDIRECT_8082
+    entrypoint: ["/bin/sh", "-c", "node /app/app/shared/init-db.js && exec node /app/app/redirector/server.js"]
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8082/-healthcheck').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    restart: unless-stopped

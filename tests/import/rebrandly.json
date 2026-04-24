@@ -1,0 +1,155 @@
+[
+    {
+        "id": "f5a109e2b22a43a7b582419ff86341f6",
+        "title": "test link 1",
+        "slashtag": "test-1",
+        "destination": "https://github.com/artyomxx/relinky?test-1",
+        "createdAt": "2025-07-17T20:29:52.000Z",
+        "updatedAt": "2025-07-17T20:29:52.000Z",
+        "expiredAt": null,
+        "status": "active",
+        "tags":
+        [],
+        "linkType": "",
+        "clicks": 56,
+        "sessions": 52,
+        "lastClickDate": "2026-04-12T07:34:01Z",
+        "lastClickAt": "2026-04-12T07:34:01Z",
+        "isPublic": false,
+        "shortUrl": "link.example.com/test-1",
+        "domainId": "10192f60a26a4ef1ba07531bb893f2c3",
+        "domainName": "link.example.com",
+        "domain":
+        {
+            "id": "10192f60a26a4ef1ba07531bb893f2c3",
+            "ref": "/domains/10192f60a26a4ef1ba07531bb893f2c3",
+            "fullName": "link.example.com",
+            "ownerId": "14de11dd5e2aa37ca42bc90b66b0a330",
+            "sharing":
+            {
+                "protocol":
+                {
+                    "allowed":
+                    [
+                        "http",
+                        "https"
+                    ],
+                    "default": "https"
+                }
+            },
+            "revoked": false,
+            "active": true
+        },
+        "https": true,
+        "favourite": false,
+        "creator":
+        {
+            "id": "14de11dd5e2aa37ca42bc90b66b0a330",
+            "fullName": "Artyom",
+            "avatarUrl": "https://s.gravatar.com/avatar/14de11dd5e2aa37ca42bc90b66b0a330?size=80&d=retro&rating=g"
+        },
+        "integrated": false
+    },
+    {
+        "id": "2677f843358d405e84d8de226e3d6cc0",
+        "title": "Ducky Duck",
+        "slashtag": "test-link-2-very-long-slug-2026-04-24",
+        "destination": "https://duckduckgo.com?q=relinky%20url%20shortener",
+        "createdAt": "2025-06-28T11:03:20.000Z",
+        "updatedAt": "2025-06-28T11:03:20.000Z",
+        "expiredAt": null,
+        "status": "active",
+        "tags":
+        [],
+        "linkType": "",
+        "clicks": 51,
+        "sessions": 49,
+        "lastClickDate": "2026-04-20T02:20:36Z",
+        "lastClickAt": "2026-04-20T02:20:36Z",
+        "isPublic": false,
+        "shortUrl": "link.example.com/test-link-2-very-long-slug-2026-04-24",
+        "domainId": "10192f60a26a4ef1ba07531bb893f2c3",
+        "domainName": "link.example.com",
+        "domain":
+        {
+            "id": "10192f60a26a4ef1ba07531bb893f2c3",
+            "ref": "/domains/10192f60a26a4ef1ba07531bb893f2c3",
+            "fullName": "link.example.com",
+            "ownerId": "14de11dd5e2aa37ca42bc90b66b0a330",
+            "sharing":
+            {
+                "protocol":
+                {
+                    "allowed":
+                    [
+                        "http",
+                        "https"
+                    ],
+                    "default": "https"
+                }
+            },
+            "revoked": false,
+            "active": true
+        },
+        "https": true,
+        "favourite": false,
+        "creator":
+        {
+            "id": "14de11dd5e2aa37ca42bc90b66b0a330",
+            "fullName": "Artyom",
+            "avatarUrl": "https://s.gravatar.com/avatar/14de11dd5e2aa37ca42bc90b66b0a330?size=80&d=retro&rating=g"
+        },
+        "integrated": false
+    },
+    {
+        "id": "cbe7604790f9922f95b4275e5a9ce6a1",
+        "title": "Github",
+        "slashtag": "url-shortener",
+        "destination": "https://github.com/artyomxx/relinky",
+        "createdAt": "2025-04-17T15:24:58.000Z",
+        "updatedAt": "2025-04-17T15:24:58.000Z",
+        "expiredAt": null,
+        "status": "active",
+        "tags":
+        [],
+        "linkType": "",
+        "clicks": 119,
+        "sessions": 119,
+        "lastClickDate": "2026-04-24T07:16:35Z",
+        "lastClickAt": "2026-04-24T07:16:35Z",
+        "isPublic": false,
+        "shortUrl": "go.example.com/url-shortener",
+        "domainId": "20192f60a26a4af1ba07531bb893f2c5",
+        "domainName": "go.example.com",
+        "domain":
+        {
+            "id": "20192f60a26a4af1ba07531bb893f2c5",
+            "ref": "/domains/20192f60a26a4af1ba07531bb893f2c5",
+            "fullName": "go.example.com",
+            "ownerId": "14de11dd5e2aa37ca42bc90b66b0a330",
+            "sharing":
+            {
+                "protocol":
+                {
+                    "allowed":
+                    [
+                        "http",
+                        "https"
+                    ],
+                    "default": "https"
+                }
+            },
+            "revoked": false,
+            "active": true
+        },
+        "https": true,
+        "favourite": false,
+        "creator":
+        {
+            "id": "14de11dd5e2aa37ca42bc90b66b0a330",
+            "fullName": "Artyom",
+            "avatarUrl": "https://s.gravatar.com/avatar/14de11dd5e2aa37ca42bc90b66b0a330?size=80&d=retro&rating=g"
+        },
+        "integrated": false
+    }
+]

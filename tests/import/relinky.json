@@ -1,0 +1,57 @@
+[
+  {
+    "domain": "go.example.com",
+    "slug": "test-22-long-slug-2026-04-24",
+    "url": "https://example.com/some-page/test/2?utm_source=example&utm_medium=test&utm_content=test-2-long-slug-2026-04-24&utm_campaign=example",
+    "keep_referrer": false,
+    "keep_query_params": false,
+    "redirect_HTTP_response_code": 301,
+    "created": "2026-04-23"
+  },
+  {
+    "domain": "go.example.com",
+    "slug": "whatever-wherever",
+    "url": "https://duckduckgo.com/?q=whatever",
+    "keep_referrer": false,
+    "keep_query_params": false,
+    "redirect_HTTP_response_code": 303,
+    "created": "2026-04-23"
+  },
+  {
+    "domain": "short.example.com",
+    "slug": "url-shortener",
+    "url": "https://github.com/artyomxx/relinky",
+    "keep_referrer": false,
+    "keep_query_params": false,
+    "redirect_HTTP_response_code": 303,
+    "created": "2025-04-17"
+  },
+  {
+    "domain": "link.example.com",
+    "slug": "test-999",
+    "url": "https://example.com/some-page/test/1?utm_source=example&utm_medium=test&utm_content=test-1&utm_campaign=example",
+    "keep_referrer": false,
+    "keep_query_params": false,
+    "redirect_HTTP_response_code": 301,
+    "expire": "2026-04-22",
+    "created": "2026-04-23"
+  },
+  {
+    "domain": "link.example.com",
+    "slug": "test-link-very-long-slug-99",
+    "url": "https://duckduckgo.com?q=relinky%20url%20shortener",
+    "keep_referrer": false,
+    "keep_query_params": false,
+    "redirect_HTTP_response_code": 303,
+    "created": "2025-06-28"
+  },
+  {
+    "domain": "v.example.com",
+    "slug": "funny-cat-video-42",
+    "url": "https://duckduckgo.com/?q=funny-cat-video",
+    "keep_referrer": false,
+    "keep_query_params": false,
+    "redirect_HTTP_response_code": 303,
+    "created": "2026-04-23"
+  }
+]

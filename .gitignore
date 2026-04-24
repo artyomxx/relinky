@@ -1,0 +1,9 @@
+.env
+node_modules/
+db/*.db
+db/*.db-wal
+db/*.db-shm
+app/admin/frontend/dist/
+.DS_Store
+*.log
+.not-in-git/

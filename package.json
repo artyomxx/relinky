@@ -1,0 +1,31 @@
+{
+	"name": "relinky",
+	"version": "1.0.0",
+	"type": "module",
+	"description": "A DIY link redirector web-app",
+	"scripts": {
+		"dev": "concurrently -k -n backend,frontend -c auto \"npm:dev:backend\" \"npm:dev:frontend\"",
+		"dev:backend": "ADMIN_PASSWORD_HASH='$6$U6FoHpuonLWpqT2s$Zx/tZFXdqzNvRCM./BBzF8j57S65BzONzgQ/Bij2j9B6zepxB1OPLUr.yUdwVnGD31ATIzONf9wtNFPQPbbRt.' node --watch-path=start.js --watch-path=app/admin/backend --watch-path=app/redirector --watch-path=app/shared start.js",
+		"dev:frontend": "vite",
+		"build": "vite build",
+		"start": "node start.js",
+		"hash-password": "node scripts/hash-admin-password.mjs",
+		"test": "node --test --test-concurrency=1",
+		"test:spec": "node --test --test-concurrency=1 --test-reporter=spec",
+		"test:tap": "node --test --test-concurrency=1 --test-reporter=tap"
+	},
+	"dependencies": {
+		"better-sqlite3": "^11.0.0",
+		"pinia": "^2.1.0",
+		"sha512-crypt-ts": "^0.1.27",
+		"ua-parser-js": "^1.0.37",
+		"uplot": "^1.6.24",
+		"vue": "^3.4.0",
+		"vue-router": "^4.2.5"
+	},
+	"devDependencies": {
+		"@vitejs/plugin-vue": "^5.0.0",
+		"concurrently": "^9.2.1",
+		"vite": "^5.0.0"
+	}
+}
