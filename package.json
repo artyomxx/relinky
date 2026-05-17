@@ -15,7 +15,7 @@
 		"test:tap": "node --test --test-concurrency=1 --test-reporter=tap"
 	},
 	"dependencies": {
-		"better-sqlite3": "^11.0.0",
+		"better-sqlite3": "^12.10.0",
 		"pinia": "^2.1.0",
 		"sha512-crypt-ts": "^0.1.27",
 		"ua-parser-js": "^1.0.37",
