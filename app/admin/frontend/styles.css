@@ -9,7 +9,7 @@
 	/* Text colors */
 	--text-primary: #d4d4d4;
 	--text-secondary: #858585;
-	--text-tertiary: #cccccc;
+	--text-tertiary: #666666;
 	--text-white: #fff;
 	--text-light: #ddd;
 	
@@ -30,8 +30,28 @@
 	/* Accent colors */
 	--accent-success: #42b983;
 	--accent-info: #4ec9b0;
-	--accent-warning: #d19a66;
+	--accent-warning: #ce5514;
 	--accent-error: #f48771;
+
+	/* Unsaved field marker (left gradient, not border) */
+	--field-changed-accent: var(--accent-warning);
+	--field-changed-width: .2em;
+
+	/* FieldHint popover (error / warning share the same structure) */
+	--field-hint-error-bg: #3a1f1c;
+	--field-hint-error-border: var(--accent-error);
+	--field-hint-error-text: #ffe8e3;
+	--field-hint-warning-bg: color-mix(in srgb, var(--accent-warning) 26%, var(--bg-primary));
+	--field-hint-warning-border: var(--accent-warning);
+	--field-hint-warning-text: color-mix(in srgb, var(--accent-warning) 10%, #fff);
+	--field-hint-info-bg: var(--bg-tertiary);
+	--field-hint-info-border: var(--bg-border);
+	--field-hint-info-text: var(--text-primary);
+
+	/* Form pending data (shimmer on real controls until loaded) */
+	--form-pending-base: var(--bg-secondary);
+	--form-pending-mid: var(--bg-tertiary);
+	--form-pending-highlight: color-mix(in srgb, var(--bg-hover) 70%, var(--text-secondary) 8%);
 }
 
 * {
@@ -103,6 +123,7 @@ button:disabled {
 }
 
 input, select, textarea {
+	outline: none;
 	background: var(--bg-secondary);
 	color: var(--text-primary);
 	border: 1px solid var(--bg-border);
@@ -112,8 +133,35 @@ input, select, textarea {
 }
 
 input:focus, select:focus, textarea:focus {
-	outline: 1px solid var(--link-base);
+	outline: none;
 	border-color: var(--link-base);
+}
+
+/* Dirty / unsaved field: wide left fade (background gradient, border unchanged) */
+input.field-changed:not(:disabled),
+select.field-changed:not(:disabled),
+textarea.field-changed:not(:disabled) {
+	background-color: var(--bg-secondary);
+	background-image: linear-gradient(
+		to right,
+		var(--field-changed-accent),
+		transparent
+	);
+	background-size: var(--field-changed-width) 100%;
+	background-repeat: no-repeat;
+	background-position: left center;
+}
+
+label.field-changed:has(input[type="checkbox"]) {
+	overflow: visible;
+	background-image: linear-gradient(
+		to right,
+		var(--field-changed-accent),
+		transparent
+	);
+	background-size: 8em 2px;
+	background-repeat: no-repeat;
+	background-position: left bottom;
 }
 
 table {
@@ -289,6 +337,106 @@ a.link-small {
 	margin-top: 1.5rem;
 }
 
+/* Status line left of action buttons (loading / saving / feedback) */
+.form-status-bar {
+	flex: 1 1 auto;
+	margin-right: auto;
+	min-height: 1.25rem;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+	color: var(--text-secondary);
+	text-align: left;
+}
+
+.form-status-bar:empty {
+	display: none;
+}
+
+.form-status-bar--loading,
+.form-status-bar--saving {
+	color: var(--text-tertiary);
+}
+
+/* Trailing dots cycle (… / . / .. / ...); use without literal "..." in copy */
+.form-status-bar--loading::after,
+.form-status-bar--saving::after,
+.animated-ellipsis::after {
+	content: '';
+	animation: animated-ellipsis .8s steps(4, end) infinite;
+}
+
+.animated-ellipsis {
+	display: inline-block;
+	width: 1.5ch;
+	vertical-align: baseline;
+}
+
+.form-status-bar--success {
+	color: var(--accent-success);
+}
+
+.form-status-bar--error {
+	color: var(--accent-error);
+}
+
+/* While submitting to the server (add .form-syncing on <form>) */
+.form-syncing .tab-button {
+	opacity: 0.65;
+	cursor: wait;
+}
+
+/* Form with real controls visible but data not loaded yet (add .form-pending-data on <form>) */
+.form-pending-data__fields {
+	border: none;
+	margin: 0;
+	padding: 0;
+	min-width: 0;
+}
+
+.form-pending-data input:not([type="checkbox"]):not([type="radio"]),
+.form-pending-data select,
+.form-pending-data textarea {
+	color: transparent;
+	caret-color: transparent;
+	background-color: var(--form-pending-base);
+	background-image: linear-gradient(
+		100deg,
+		var(--form-pending-base) 0%,
+		var(--form-pending-mid) 42%,
+		var(--form-pending-highlight) 50%,
+		var(--form-pending-mid) 58%,
+		var(--form-pending-base) 100%
+	);
+	background-size: 220% 100%;
+	background-repeat: no-repeat;
+	animation: form-pending-wave 2.4s ease-in-out infinite;
+	border-color: var(--bg-border);
+	cursor: wait;
+}
+
+.form-pending-data input[type="checkbox"],
+.form-pending-data input[type="radio"] {
+	opacity: 0.5;
+	cursor: wait;
+}
+
+.form-pending-data .field-changed:not([type="checkbox"]):not([type="radio"]) {
+	background-image: linear-gradient(
+		100deg,
+		var(--form-pending-base) 0%,
+		var(--form-pending-mid) 42%,
+		var(--form-pending-highlight) 50%,
+		var(--form-pending-mid) 58%,
+		var(--form-pending-base) 100%
+	);
+	box-shadow: none;
+}
+
+.form-pending-data .tab-button {
+	opacity: 0.65;
+	cursor: wait;
+}
+
 /* Global modal styles */
 .modal-overlay {
 	position: fixed;
@@ -426,5 +574,38 @@ a.link-small {
 	to {
 		opacity: 1;
 		transform: scale(1);
+	}
+}
+
+@keyframes form-pending-wave {
+	0% {
+		background-position: 120% 0;
+	}
+	100% {
+		background-position: -120% 0;
+	}
+}
+
+@keyframes animated-ellipsis {
+	0% { content: '...'; }
+	33% { content: ''; }
+	66% { content: '.'; }
+	100% { content: '..'; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.form-pending-data input:not([type="checkbox"]):not([type="radio"]),
+	.form-pending-data select,
+	.form-pending-data textarea {
+		animation: none;
+		background-image: none;
+		background-color: var(--form-pending-mid);
+	}
+
+	.form-status-bar--loading::after,
+	.form-status-bar--saving::after,
+	.animated-ellipsis::after {
+		animation: none;
+		content: '...';
 	}
 }

@@ -26,6 +26,7 @@ export const pathLinksImport = '/api/links/import'
 export const pathLinksExport = '/api/links/export'
 export const pathLinksExportCount = '/api/links/export/count'
 export const pathLinksCheckUrlBase = '/api/links/check-url'
+export const pathLinksCheckSlugBase = '/api/links/check-slug'
 
 /** Import / export test helpers */
 export const importFlagsNone = Object.freeze({ createDomains: false, replaceExisting: false })

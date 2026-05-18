@@ -103,7 +103,7 @@
 				ref="linkFormModal"
 				:link="editingLink"
 				@close="closeModal"
-				@save="handleSave"
+				@saved="closeModal"
 			/>
 		</Transition>
 	</div>
@@ -356,19 +356,6 @@ function closeModal() {
 	showCreateModal.value = false
 	editingLink.value = null
 	router.push('/links')
-}
-
-async function handleSave(linkData) {
-	try {
-		if (editingLink.value) {
-			await linksStore.updateLink(editingLink.value.id, linkData)
-		} else {
-			await linksStore.createLink(linkData)
-		}
-		closeModal()
-	} catch (err) {
-		alert(err.message)
-	}
 }
 
 // Watch for search input changes and update route

@@ -1,14 +1,10 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
-import { createServer } from 'node:net'
-import { setTimeout as delay } from 'node:timers/promises'
 import {
 	adminListenHost,
 	adminPassword,
 	adminServerEntry,
 	baseHost,
-	devPasswordHash,
 	pathAuthCheck,
 	pathAuthLogin,
 	pathDomains,
@@ -21,6 +17,13 @@ import {
 	pathSettingsApiKeys,
 	pathStats
 } from './constants.js'
+import {
+	allocAdminPort,
+	buildAdminTestEnv,
+	spawnTestServer,
+	stopTestServer,
+	waitForHealth
+} from './helpers.js'
 const missingDomainPrefix = 'missing'
 const testDomainPrefix = {
 	nonExternal: 'test-non-external',
@@ -38,63 +41,6 @@ const blockedAllowlistIp = '203.0.113.99'
 
 let child = null
 let baseUrl = ''
-
-async function getFreePort() {
-	return await new Promise((resolve, reject) => {
-		const server = createServer()
-		server.listen(0, adminListenHost, () => {
-			const address = server.address()
-			server.close(() => {
-				if (!address || typeof address === 'string') {
-					reject(new Error('Failed to allocate free port'))
-					return
-				}
-				resolve(address.port)
-			})
-		})
-		server.on('error', reject)
-	})
-}
-
-async function waitForHealth(url, timeoutMs = 15000) {
-	const started = Date.now()
-	for (;;) {
-		try {
-			const res = await fetch(`${url}${pathHealthcheck}`)
-			if (res.ok) return
-		} catch {}
-		if (Date.now() - started > timeoutMs) {
-			throw new Error('Timed out waiting for admin server healthcheck')
-		}
-		await delay(200)
-	}
-}
-
-function startAdminServer(port) {
-	child = spawn('node', [adminServerEntry], {
-		cwd: process.cwd(),
-		env: {
-			...process.env,
-			ADMIN_IP: adminListenHost,
-			ADMIN_PORT: String(port),
-			ADMIN_PASSWORD_HASH: devPasswordHash
-		},
-		stdio: 'pipe'
-	})
-	child.stdout.on('data', () => {})
-	child.stderr.on('data', () => {})
-}
-
-async function stopAdminServer() {
-	if (!child) return
-	const proc = child
-	child = null
-	proc.kill('SIGTERM')
-	await new Promise(resolve => {
-		proc.once('exit', () => resolve())
-		setTimeout(() => resolve(), 5000)
-	})
-}
 
 async function req(path, { method = 'GET', token, body } = {}) {
 	const headers = {}
@@ -163,14 +109,15 @@ async function deleteApiKey(adminToken, keyId) {
 }
 
 before(async () => {
-	const port = await getFreePort()
+	const port = await allocAdminPort()
 	baseUrl = `http://${adminListenHost}:${port}`
-	startAdminServer(port)
-	await waitForHealth(baseUrl)
+	child = spawnTestServer(adminServerEntry, buildAdminTestEnv(port))
+	await waitForHealth(baseUrl, { label: 'admin server', child })
 })
 
 after(async () => {
-	await stopAdminServer()
+	await stopTestServer(child)
+	child = null
 })
 
 test('external api key can read links and stats', { concurrency: false }, async () => {
