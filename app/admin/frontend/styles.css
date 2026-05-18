@@ -46,7 +46,7 @@
 	--field-hint-warning-text: color-mix(in srgb, var(--accent-warning) 10%, #fff);
 	--field-hint-info-bg: var(--bg-tertiary);
 	--field-hint-info-border: var(--bg-border);
-	--field-hint-info-text: var(--text-tertiary);
+	--field-hint-info-text: var(--text-primary);
 
 	/* Form pending data (shimmer on real controls until loaded) */
 	--form-pending-base: var(--bg-secondary);
