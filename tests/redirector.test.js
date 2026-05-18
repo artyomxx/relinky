@@ -2,97 +2,32 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import http from 'node:http'
-import { spawn } from 'node:child_process'
-import { createServer } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import {
 	adminListenHost,
 	adminPassword,
 	adminServerEntry,
 	baseHost,
-	devPasswordHash,
 	pathAuthLogin,
 	pathDomains,
 	pathDomainsDeleteWithLinks,
-	pathHealthcheck,
 	pathLinks,
 	redirectorServerEntry
 } from './constants.js'
+import {
+	allocAdminPort,
+	allocRedirectorPort,
+	buildAdminTestEnv,
+	buildRedirectorTestEnv,
+	spawnTestServer,
+	stopTestServer,
+	waitForHealth
+} from './helpers.js'
 
 let adminChild = null
 let redirectorChild = null
 let adminBaseUrl = ''
 let redirectorPort = 0
-
-async function getFreePort() {
-	return await new Promise((resolve, reject) => {
-		const server = createServer()
-		server.listen(0, adminListenHost, () => {
-			const address = server.address()
-			server.close(() => {
-				if (!address || typeof address === 'string') {
-					reject(new Error('Failed to allocate free port'))
-					return
-				}
-				resolve(address.port)
-			})
-		})
-		server.on('error', reject)
-	})
-}
-
-async function waitForHttpOk(url, label, timeoutMs = 20000) {
-	const started = Date.now()
-	for (;;) {
-		try {
-			const res = await fetch(`${url}${pathHealthcheck}`)
-			if (res.ok) return
-		} catch {}
-		if (Date.now() - started > timeoutMs) {
-			throw new Error(`Timed out waiting for ${label}`)
-		}
-		await delay(200)
-	}
-}
-
-function startAdminServer(port) {
-	adminChild = spawn('node', [adminServerEntry], {
-		cwd: process.cwd(),
-		env: {
-			...process.env,
-			ADMIN_IP: adminListenHost,
-			ADMIN_PORT: String(port),
-			ADMIN_PASSWORD_HASH: devPasswordHash
-		},
-		stdio: 'pipe'
-	})
-	adminChild.stdout.on('data', () => {})
-	adminChild.stderr.on('data', () => {})
-}
-
-function startRedirectorServer(port) {
-	redirectorChild = spawn('node', [redirectorServerEntry], {
-		cwd: process.cwd(),
-		env: {
-			...process.env,
-			REDIRECTOR_IP: adminListenHost,
-			REDIRECTOR_PORT: String(port)
-		},
-		stdio: 'pipe'
-	})
-	redirectorChild.stdout.on('data', () => {})
-	redirectorChild.stderr.on('data', () => {})
-}
-
-async function stopChild(proc) {
-	if (!proc) return
-	const p = proc
-	p.kill('SIGTERM')
-	await new Promise(resolve => {
-		p.once('exit', () => resolve())
-		setTimeout(() => resolve(), 5000)
-	})
-}
 
 async function req(path, { method = 'GET', token, body } = {}) {
 	const headers = {}
@@ -201,19 +136,22 @@ function uniqueRedirectDomain() {
 }
 
 before(async () => {
-	const adminPort = await getFreePort()
-	redirectorPort = await getFreePort()
+	const adminPort = await allocAdminPort()
+	redirectorPort = await allocRedirectorPort()
 	adminBaseUrl = `http://${adminListenHost}:${adminPort}`
-	startAdminServer(adminPort)
-	await waitForHttpOk(adminBaseUrl, 'admin server')
-	startRedirectorServer(redirectorPort)
-	await waitForHttpOk(`http://${adminListenHost}:${redirectorPort}`, 'redirector')
+	adminChild = spawnTestServer(adminServerEntry, buildAdminTestEnv(adminPort))
+	await waitForHealth(adminBaseUrl, { label: 'admin server', child: adminChild })
+	redirectorChild = spawnTestServer(redirectorServerEntry, buildRedirectorTestEnv(redirectorPort))
+	await waitForHealth(`http://${adminListenHost}:${redirectorPort}`, {
+		label: 'redirector',
+		child: redirectorChild
+	})
 })
 
 after(async () => {
-	await stopChild(redirectorChild)
+	await stopTestServer(redirectorChild)
 	redirectorChild = null
-	await stopChild(adminChild)
+	await stopTestServer(adminChild)
 	adminChild = null
 })
 
