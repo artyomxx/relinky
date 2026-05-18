@@ -13,6 +13,7 @@
 				novalidate
 				@submit.prevent="handleSubmit"
 				@input="onFormInput"
+				@change="onFormChange"
 				@focusin="onFormFocusIn"
 			>
 				<fieldset class="form-pending-data__fields" :disabled="formFieldsDisabled">
@@ -53,7 +54,11 @@
 								<div class="form-group">
 									<label>Domain / Slug</label>
 									<div class="domain-slug-row">
-										<select v-model="formData.domain" required :class="{ 'field-changed': isFieldChanged('domain') }">
+										<select
+											v-model="formData.domain"
+											required
+											:class="{ 'field-changed': isFieldChanged('domain') }"
+										>
 											<option value="">Select domain...</option>
 											<option v-for="domain in settingsStore.domains" :key="domain.id" :value="domain.domain">
 												{{ domain.domain }}
@@ -216,6 +221,7 @@ const urlInput = ref(null)
 const cancelButton = ref(null)
 const submitButton = ref(null)
 const initialFormData = ref(null)
+const initializedFormKey = ref(null)
 const fieldHint = useFieldHint()
 const hintShown = ref(false)
 let suppressUnsavedHintFocusDismiss = false
@@ -225,10 +231,28 @@ function dismissUnsavedWarning() {
 	hintShown.value = false
 }
 
-function onFormInput() {
+function onFormInput(event) {
+	// Select fires `input` before `change`; a form-level handler would re-render with a
+	// stale :value and snap the dropdown back (edit mode looked "stuck").
+	if (event.target?.tagName === 'SELECT') {
+		return
+	}
 	fieldHint.hide()
 	if (hintShown.value) {
 		hintShown.value = false
+	}
+}
+
+function onFormChange(event) {
+	if (event.target?.tagName !== 'SELECT') {
+		return
+	}
+	fieldHint.hide()
+	if (hintShown.value) {
+		hintShown.value = false
+	}
+	if (event.target.closest('.domain-slug-row')) {
+		nextTick(() => checkSlug())
 	}
 }
 
@@ -315,6 +339,10 @@ const formData = ref({
 	keep_query_params: false
 })
 
+const linkFormKey = computed(() =>
+	props.link?.id != null ? String(props.link.id) : 'create'
+)
+
 function isFieldChanged(key) {
 	if (!initialFormData.value) return false
 	return formData.value[key] !== initialFormData.value[key]
@@ -362,6 +390,11 @@ function handleEscape(event) {
 }
 
 async function initializeForm() {
+	const key = linkFormKey.value
+	if (initializedFormKey.value === key && formDataReady.value) {
+		return
+	}
+
 	formDataReady.value = false
 	formSyncing.value = false
 	dismissUnsavedWarning()
@@ -375,19 +408,21 @@ async function initializeForm() {
 			await settingsStore.fetchSettings()
 		}
 
-		if (props.link) {
-			const hasExpire = !!props.link.expire
+		const link = props.link ? JSON.parse(JSON.stringify(props.link)) : null
+
+		if (link) {
+			const hasExpire = !!link.expire
 			expireEnabled.value = hasExpire
 			formData.value = {
-				domain: props.link.domain,
-				slug: props.link.slug,
-				url: props.link.url,
-				expired_url: props.link.expired_url || '',
-				expire: hasExpire ? new Date(props.link.expire).toISOString().slice(0, 16) : '',
-				comment: props.link.comment || '',
-				redirect_code: props.link.redirect_code?.toString() || settingsStore.defaults.redirect_code || '303',
-				keep_referrer: props.link.keep_referrer !== undefined ? props.link.keep_referrer : (settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true),
-				keep_query_params: props.link.keep_query_params !== undefined ? props.link.keep_query_params : (settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true)
+				domain: link.domain || '',
+				slug: link.slug,
+				url: link.url,
+				expired_url: link.expired_url || '',
+				expire: hasExpire ? new Date(link.expire).toISOString().slice(0, 16) : '',
+				comment: link.comment || '',
+				redirect_code: link.redirect_code?.toString() || settingsStore.defaults.redirect_code || '303',
+				keep_referrer: link.keep_referrer !== undefined ? link.keep_referrer : (settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true),
+				keep_query_params: link.keep_query_params !== undefined ? link.keep_query_params : (settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true)
 			}
 		} else {
 			expireEnabled.value = false
@@ -414,6 +449,7 @@ async function initializeForm() {
 
 		initialExpireEnabled.value = expireEnabled.value
 		initialFormData.value = JSON.parse(JSON.stringify(formData.value))
+		initializedFormKey.value = key
 	} finally {
 		formDataReady.value = true
 		await nextTick()
@@ -430,17 +466,17 @@ const boundHandleEscape = (event) => handleEscape(event)
 defineExpose({ hasChanges, boundHandleEscape })
 
 onMounted(() => {
-	initializeForm()
 	window.addEventListener('keydown', boundHandleEscape)
 })
 
 onUnmounted(() => {
 	window.removeEventListener('keydown', boundHandleEscape)
 	dismissUnsavedWarning()
+	initializedFormKey.value = null
 })
 
-// Re-initialize when link prop changes
-watch(() => props.link, initializeForm, { immediate: false })
+// Re-initialize only when opening a different link (not on reactive store updates)
+watch(linkFormKey, initializeForm, { immediate: true })
 
 // Clear expiration date when checkbox is unchecked
 watch(expireEnabled, (enabled) => {
@@ -497,14 +533,18 @@ function handleExpiredUrlBlur() {
 async function checkSlug() {
 	const domain = formData.value.domain?.trim()
 	const slug = formData.value.slug?.trim()
-	if (!domain || !slug) return
+	if (!domain || !slug) return false
 
-	if (props.link && domain === props.link.domain && slug === props.link.slug) {
-		return
+	if (
+		initialFormData.value &&
+		domain === initialFormData.value.domain &&
+		slug === initialFormData.value.slug
+	) {
+		return false
 	}
 
 	const existing = await linksStore.checkSlug(domain, slug, props.link?.id)
-	if (existing.length === 0) return
+	if (existing.length === 0) return false
 
 	const msg =
 		existing.length === 1
@@ -516,6 +556,7 @@ async function checkSlug() {
 		message: msg,
 		variant: 'warning'
 	})
+	return true
 }
 
 async function checkUrl() {
@@ -630,6 +671,10 @@ async function handleSubmit() {
 
 	await checkUrl()
 
+	if (await checkSlug()) {
+		return
+	}
+
 	const data = {
 		...formData.value,
 		expire: expireEnabled.value && formData.value.expire ? new Date(formData.value.expire).getTime() : null,
@@ -697,6 +742,7 @@ async function handleSubmit() {
 
 .domain-slug-row select {
 	flex: 1;
+	min-width: 0;
 }
 
 .domain-slug-row .separator {

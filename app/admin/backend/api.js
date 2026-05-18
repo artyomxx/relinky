@@ -646,34 +646,46 @@ export function setupLinkRoutes(router, auth) {
 				}
 
 				let newDomain = false
+				let targetDomainId = existing.domain_id
+				const targetSlug =
+					data.slug !== undefined && data.slug !== null
+						? String(data.slug).trim()
+						: existing.slug
 
-				// Update domain if changed
-				if (data.domain !== undefined && data.domain !== null) {
-					// Get or create domain
+				if (data.domain !== undefined && data.domain !== null && data.domain !== '') {
+					const domainName = String(data.domain).trim()
 					let domainStmt = db.prepare('SELECT id FROM domains WHERE domain = ?')
-					let domainRow = domainStmt.get(data.domain)
+					let domainRow = domainStmt.get(domainName)
 					let domainId = domainRow?.id
 
 					if (!domainId) {
 						const insertDomain = db.prepare('INSERT INTO domains (domain) VALUES (?)')
-						const result = insertDomain.run(data.domain)
+						const result = insertDomain.run(domainName)
 						domainId = result.lastInsertRowid
 						newDomain = true
 					}
 
-					// Check for slug conflict on new domain (if domain changed)
-					if (domainId !== existing.domain_id) {
-						const slugToCheck = data.slug !== undefined ? data.slug : existing.slug
-						const conflictStmt = db.prepare('SELECT id FROM links WHERE domain_id = ? AND slug = ? AND id != ?')
-						const conflict = conflictStmt.get(domainId, slugToCheck, data.id)
-						if (conflict) {
-							throw new Error('Slug already exists for this domain')
-						}
-					}
+					targetDomainId = domainId
+				}
 
-					// Update domain_id
+				const conflictStmt = db.prepare(
+					'SELECT id FROM links WHERE domain_id = ? AND slug = ? AND id != ?'
+				)
+				const conflict = conflictStmt.get(targetDomainId, targetSlug, data.id)
+				if (conflict) {
+					throw new Error('Slug already exists for this domain')
+				}
+
+				// Slug before domain_id: moving domain while slug is unchanged must not
+				// briefly create a duplicate (domain_id, slug) pair on the target domain.
+				if (data.slug !== undefined && data.slug !== null) {
+					const updateSlug = db.prepare('UPDATE links SET slug = ? WHERE id = ?')
+					updateSlug.run(targetSlug, data.id)
+				}
+
+				if (targetDomainId !== existing.domain_id) {
 					const updateDomainId = db.prepare('UPDATE links SET domain_id = ? WHERE id = ?')
-					updateDomainId.run(domainId, data.id)
+					updateDomainId.run(targetDomainId, data.id)
 				}
 
 				// Update URL if changed
@@ -802,7 +814,14 @@ export function setupLinkRoutes(router, auth) {
 				setImmediate(() => scheduleGatewayReload())
 			}
 		} catch (err) {
-			sendJson(res, 400, { error: err.message || 'Invalid request' })
+			let message = err.message || 'Invalid request'
+			if (
+				message.includes('UNIQUE constraint failed') &&
+				message.includes('links.domain_id')
+			) {
+				message = 'Slug already exists for this domain'
+			}
+			sendJson(res, 400, { error: message })
 		}
 	})
 

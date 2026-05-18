@@ -292,6 +292,53 @@ test('admin link CRUD: create, read, list, check-url, update, duplicate slug, de
 	await cleanupDomain(token, domain)
 })
 
+test('update link: domain change checks final domain+slug pair', { concurrency: false }, async () => {
+	const token = await adminLogin()
+	const domainA = uniqueGeneralDomain()
+	const domainB = uniqueGeneralDomain()
+	await createDomain(token, domainA)
+	await createDomain(token, domainB)
+
+	const linkA = await req(pathLinks, {
+		method: 'POST',
+		token,
+		body: { domain: domainA, slug: 'k', url: urlValid }
+	})
+	assert.equal(linkA.status, 201)
+	const linkAId = linkA.data.id
+
+	const linkB = await req(pathLinks, {
+		method: 'POST',
+		token,
+		body: { domain: domainB, slug: 'k', url: urlValidUpdated }
+	})
+	assert.equal(linkB.status, 201)
+
+	const conflict = await req(`${pathLinks}/${linkAId}`, {
+		method: 'PUT',
+		token,
+		body: { domain: domainB, slug: 'k' }
+	})
+	assert.equal(conflict.status, 400)
+	assert.equal(conflict.data?.error, 'Slug already exists for this domain')
+
+	const ok = await req(`${pathLinks}/${linkAId}`, {
+		method: 'PUT',
+		token,
+		body: { domain: domainB, slug: 'kk' }
+	})
+	assert.equal(ok.status, 200)
+
+	const after = await req(`${pathLinks}/${linkAId}`, { token })
+	assert.equal(after.data?.domain, domainB)
+	assert.equal(after.data?.slug, 'kk')
+
+	await req(`${pathLinks}/${linkAId}`, { method: 'DELETE', token })
+	await req(`${pathLinks}/${linkB.data.id}`, { method: 'DELETE', token })
+	await cleanupDomain(token, domainA)
+	await cleanupDomain(token, domainB)
+})
+
 test('GET single link returns 404 for unknown id', { concurrency: false }, async () => {
 	const token = await adminLogin()
 	const res = await req(`${pathLinks}/999999999`, { token })
