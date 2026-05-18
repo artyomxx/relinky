@@ -11,6 +11,7 @@
 		<GeneralTab
 			v-if="activeTab === 'settings'"
 			:loading="settingsStore.loading"
+			:saving="savingSettings"
 			:domains="settingsStore.domains"
 			:local-defaults="localDefaults"
 			:local-settings="localSettings"
@@ -109,6 +110,7 @@ const showAddDomain = ref(false)
 const newDomain = ref('')
 const initialDomain = ref('')
 const saveSuccess = ref(false)
+const savingSettings = ref(false)
 const domainInput = ref(null)
 const domainCancelButton = ref(null)
 const showDomainUnsavedHint = ref(false)
@@ -417,6 +419,9 @@ function normalizeUrl(field) {
 }
 
 async function saveSettings() {
+	if (savingSettings.value) return
+	savingSettings.value = true
+	saveSuccess.value = false
 	try {
 		// Normalize URLs before saving
 		normalizeUrl('error_404_url')
@@ -458,6 +463,8 @@ async function saveSettings() {
 		}, 3000)
 	} catch (err) {
 		alert(err.message)
+	} finally {
+		savingSettings.value = false
 	}
 }
 

@@ -1,14 +1,28 @@
 <template>
-	<div class="modal-overlay" @click.self="handleClose">
+	<div class="modal-overlay" @click.self="handleOverlayClick">
 		<div class="modal">
 			<h2>{{ link ? 'Edit Link' : 'Create Link' }}</h2>
-			<form @submit.prevent="handleSubmit">
+			<form
+				ref="formRef"
+				class="link-form-modal-form"
+				:class="{
+					'form-pending-data': !formDataReady,
+					'form-syncing': formSyncing
+				}"
+				:aria-busy="!formDataReady || formSyncing"
+				novalidate
+				@submit.prevent="handleSubmit"
+				@input="onFormInput"
+				@focusin="onFormFocusIn"
+			>
+				<fieldset class="form-pending-data__fields" :disabled="formFieldsDisabled">
 				<div class="tabs link-form-modal-tabs">
 					<button 
 						type="button" 
 						class="tab-button" 
 						:class="{ active: activeTab === 'basic' }"
-						@click="activeTab = 'basic'"
+						@mousedown="onTabPointerDown"
+						@click="switchTab('basic')"
 					>
 						Basic
 					</button>
@@ -16,7 +30,8 @@
 						type="button" 
 						class="tab-button" 
 						:class="{ active: activeTab === 'expiration' }"
-						@click="activeTab = 'expiration'"
+						@mousedown="onTabPointerDown"
+						@click="switchTab('expiration')"
 					>
 						Expiration
 					</button>
@@ -24,7 +39,8 @@
 						type="button" 
 						class="tab-button" 
 						:class="{ active: activeTab === 'advanced' }"
-						@click="activeTab = 'advanced'"
+						@mousedown="onTabPointerDown"
+						@click="switchTab('advanced')"
 					>
 						Advanced
 					</button>
@@ -33,33 +49,52 @@
 				<div class="link-form-tab-panels" aria-live="polite">
 					<div class="link-form-tab-viewport">
 						<div class="link-form-tab-track" :style="{ transform: tabTrackTransform }">
-							<div class="link-form-tab-slide" :inert="activeTab !== 'basic'">
+							<div class="link-form-tab-slide" data-tab="basic" :inert="activeTab !== 'basic'">
 								<div class="form-group">
 									<label>Domain / Slug</label>
 									<div class="domain-slug-row">
-										<select v-model="formData.domain" required>
+										<select v-model="formData.domain" required :class="{ 'field-changed': isFieldChanged('domain') }">
 											<option value="">Select domain...</option>
 											<option v-for="domain in settingsStore.domains" :key="domain.id" :value="domain.domain">
 												{{ domain.domain }}
 											</option>
 										</select>
 										<span class="separator">/</span>
-										<input ref="slugInput" v-model="formData.slug" required />
+										<input
+											ref="slugInput"
+											v-model="formData.slug"
+											required
+											:class="{ 'field-changed': isFieldChanged('slug') }"
+											@blur="handleSlugBlur"
+										/>
 									</div>
 								</div>
 								<div class="form-group">
 									<label>Target URL</label>
-									<input v-model="formData.url" type="url" required @blur="handleUrlBlur" />
+									<input
+										ref="urlInput"
+										v-model="formData.url"
+										type="url"
+										required
+										pattern=".*\.\S+.*"
+										title="URL must contain at least one top-level domain (e.g., .com, .org)"
+										:class="{ 'field-changed': isFieldChanged('url') }"
+										@blur="handleUrlBlur"
+									/>
 								</div>
 								<div class="form-group">
 									<label>Comment (optional)</label>
-									<textarea v-model="formData.comment" rows="3"></textarea>
+									<textarea
+										v-model="formData.comment"
+										rows="3"
+										:class="{ 'field-changed': isFieldChanged('comment') }"
+									></textarea>
 								</div>
 							</div>
 
-							<div class="link-form-tab-slide" :inert="activeTab !== 'expiration'">
+							<div class="link-form-tab-slide" data-tab="expiration" :inert="activeTab !== 'expiration'">
 								<div class="form-group">
-									<label>
+									<label :class="{ 'field-changed': isExpireEnabledChanged() }">
 										<input type="checkbox" v-model="expireEnabled" />
 										Expire
 									</label>
@@ -71,6 +106,7 @@
 										type="datetime-local"
 										:required="expireEnabled"
 										:disabled="!expireEnabled"
+										:class="{ 'field-changed': isFieldChanged('expire') }"
 									/>
 								</div>
 								<div class="form-group">
@@ -79,15 +115,19 @@
 										v-model="formData.expired_url"
 										type="text"
 										:disabled="!expireEnabled"
+										:class="{ 'field-changed': isFieldChanged('expired_url') }"
 										@blur="handleExpiredUrlBlur"
 									/>
 								</div>
 							</div>
 
-							<div class="link-form-tab-slide" :inert="activeTab !== 'advanced'">
+							<div class="link-form-tab-slide" data-tab="advanced" :inert="activeTab !== 'advanced'">
 								<div class="form-group">
 									<label>Redirect Code</label>
-									<select v-model="formData.redirect_code">
+									<select
+										v-model="formData.redirect_code"
+										:class="{ 'field-changed': isFieldChanged('redirect_code') }"
+									>
 										<option value="301">301 - Permanent</option>
 										<option value="302">302 - Found</option>
 										<option value="303">303 - See Other</option>
@@ -96,13 +136,13 @@
 									</select>
 								</div>
 								<div class="form-group">
-									<label>
+									<label :class="{ 'field-changed': isFieldChanged('keep_referrer') }">
 										<input type="checkbox" v-model="formData.keep_referrer" />
 										Keep Referrer
 									</label>
 								</div>
 								<div class="form-group">
-									<label>
+									<label :class="{ 'field-changed': isFieldChanged('keep_query_params') }">
 										<input type="checkbox" v-model="formData.keep_query_params" />
 										Keep Query Params
 									</label>
@@ -112,36 +152,130 @@
 					</div>
 				</div>
 
-				<div v-if="showUnsavedHint" class="unsaved-hint">You have unsaved changes. Press Cancel to abandon them.</div>
+				</fieldset>
+
 				<div class="form-actions">
-					<button ref="cancelButton" type="button" @click="handleClose">Cancel</button>
-					<button type="submit">Save</button>
+					<span
+						v-if="formStatusText"
+						class="form-status-bar"
+						:class="formStatusKind ? `form-status-bar--${formStatusKind}` : undefined"
+						role="status"
+						aria-live="polite"
+					>{{ formStatusText }}</span>
+					<button
+						ref="cancelButton"
+						type="button"
+						:disabled="formSyncing"
+						@click="handleClose"
+					>
+						Cancel
+					</button>
+					<button ref="submitButton" type="submit" :disabled="formActionsDisabled">
+						Save
+					</button>
 				</div>
 			</form>
 		</div>
+		<FieldHint
+			:open="fieldHint.state.open"
+			:message="fieldHint.state.message"
+			:variant="fieldHint.state.variant"
+			:anchor="fieldHint.state.anchor"
+			:items="fieldHint.state.items"
+			:placement="fieldHint.state.placement"
+			:see-more-href="fieldHint.state.seeMoreHref"
+			:see-more-label="fieldHint.state.seeMoreLabel"
+		/>
 	</div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useLinksStore } from '../stores/links.js'
 import { useSettingsStore } from '../stores/settings.js'
+import { useFieldHint } from '../composables/useFieldHint.js'
+import FieldHint from './FieldHint.vue'
 
 const props = defineProps({
 	link: Object
 })
 
-const emit = defineEmits(['close', 'save'])
+const emit = defineEmits(['close', 'saved'])
 
+const router = useRouter()
 const linksStore = useLinksStore()
 const settingsStore = useSettingsStore()
+
+const DUPLICATE_URL_PREVIEW_LIMIT = 5
+const formDataReady = ref(false)
+const formSyncing = ref(false)
+const formRef = ref(null)
 const slugInput = ref(null)
+const urlInput = ref(null)
 const cancelButton = ref(null)
+const submitButton = ref(null)
 const initialFormData = ref(null)
-const isHandlingEscape = ref(false)
-const showUnsavedHint = ref(false)
+const fieldHint = useFieldHint()
 const hintShown = ref(false)
+let suppressUnsavedHintFocusDismiss = false
+
+function dismissUnsavedWarning() {
+	fieldHint.hide()
+	hintShown.value = false
+}
+
+function onFormInput() {
+	fieldHint.hide()
+	if (hintShown.value) {
+		hintShown.value = false
+	}
+}
+
+function onFormFocusIn(event) {
+	if (!hintShown.value || suppressUnsavedHintFocusDismiss) return
+	if (event.target === cancelButton.value) return
+	dismissUnsavedWarning()
+}
+
+function showUnsavedWarning() {
+	hintShown.value = true
+	fieldHint.show({
+		anchor: cancelButton.value,
+		message: 'You have unsaved changes. Press Cancel or Esc again to abandon them.',
+		variant: 'warning'
+	})
+	suppressUnsavedHintFocusDismiss = true
+	nextTick(() => {
+		cancelButton.value?.focus()
+		nextTick(() => {
+			suppressUnsavedHintFocusDismiss = false
+		})
+	})
+}
+
 const activeTab = ref('basic')
+let skipFieldBlurCheck = false
+
+function onTabPointerDown() {
+	// mousedown runs before blur on the field losing focus (tab click)
+	skipFieldBlurCheck = true
+	fieldHint.hide()
+}
+
+function switchTab(tab) {
+	if (activeTab.value === tab) {
+		nextTick(() => {
+			skipFieldBlurCheck = false
+		})
+		return
+	}
+	activeTab.value = tab
+	nextTick(() => {
+		skipFieldBlurCheck = false
+	})
+}
+
 const tabSlideIndex = computed(() => {
 	switch (activeTab.value) {
 		case 'basic':
@@ -155,7 +289,20 @@ const tabSlideIndex = computed(() => {
 	}
 })
 const tabTrackTransform = computed(() => `translateX(calc(-${tabSlideIndex.value} * 100% / 3))`)
+const formFieldsDisabled = computed(() => !formDataReady.value || formSyncing.value)
+const formActionsDisabled = computed(() => !formDataReady.value || formSyncing.value)
+const formStatusText = computed(() => {
+	if (formSyncing.value) return 'Saving'
+	if (!formDataReady.value) return 'Loading data'
+	return ''
+})
+const formStatusKind = computed(() => {
+	if (formSyncing.value) return 'saving'
+	if (!formDataReady.value) return 'loading'
+	return ''
+})
 const expireEnabled = ref(false)
+const initialExpireEnabled = ref(false)
 const formData = ref({
 	domain: '',
 	slug: '',
@@ -168,108 +315,111 @@ const formData = ref({
 	keep_query_params: false
 })
 
+function isFieldChanged(key) {
+	if (!initialFormData.value) return false
+	return formData.value[key] !== initialFormData.value[key]
+}
+
+function isExpireEnabledChanged() {
+	return expireEnabled.value !== initialExpireEnabled.value
+}
+
 function hasChanges() {
 	if (!initialFormData.value) return false
-	const current = JSON.stringify(formData.value)
-	const initial = JSON.stringify(initialFormData.value)
-	return current !== initial
+	if (isExpireEnabledChanged()) return true
+	return JSON.stringify(formData.value) !== JSON.stringify(initialFormData.value)
+}
+
+function handleOverlayClick() {
+	if (formSyncing.value) return
+	if (hasChanges()) {
+		showUnsavedWarning()
+		return
+	}
+	handleClose()
 }
 
 function handleClose() {
-	// If there are changes and we haven't shown the hint yet, show hint and focus cancel button
+	if (formSyncing.value) return
 	if (hasChanges() && !hintShown.value) {
-		showUnsavedHint.value = true
-		hintShown.value = true
-		nextTick(() => {
-			if (cancelButton.value) {
-				cancelButton.value.focus()
-			}
-		})
-		// Hide hint after 5 seconds
-		setTimeout(() => {
-			showUnsavedHint.value = false
-		}, 5000)
+		showUnsavedWarning()
 		return
 	}
-	// If hint was already shown, or no changes, close normally
-	showUnsavedHint.value = false
-	hintShown.value = false
+	dismissUnsavedWarning()
+	if (initialFormData.value) {
+		formData.value = JSON.parse(JSON.stringify(initialFormData.value))
+		expireEnabled.value = initialExpireEnabled.value
+	}
 	emit('close')
 }
 
 function handleEscape(event) {
-	if (event.key === 'Escape') {
-		event.preventDefault()
-		event.stopPropagation()
-		// If hint was already shown, don't handle ESC again - let the Cancel button handle it
-		if (hintShown.value) {
-			return
-		}
-		handleClose()
-	}
+	if (event.key !== 'Escape') return
+	if (formSyncing.value) return
+	event.preventDefault()
+	event.stopPropagation()
+	handleClose()
 }
 
 async function initializeForm() {
-	// Reset hint state when form is initialized
-	hintShown.value = false
-	showUnsavedHint.value = false
-	
-	// Fetch domains if not already loaded
-	if (settingsStore.domains.length === 0) {
-		await settingsStore.fetchDomains()
-	}
+	formDataReady.value = false
+	formSyncing.value = false
+	dismissUnsavedWarning()
 
-	// Fetch settings to get default domain
-	if (Object.keys(settingsStore.defaults).length === 0) {
-		await settingsStore.fetchSettings()
-	}
-
-	if (props.link) {
-		// Editing existing link
-		const hasExpire = !!props.link.expire
-		expireEnabled.value = hasExpire
-		formData.value = {
-			domain: props.link.domain,
-			slug: props.link.slug,
-			url: props.link.url,
-			expired_url: props.link.expired_url || '',
-			expire: hasExpire ? new Date(props.link.expire).toISOString().slice(0, 16) : '',
-			comment: props.link.comment || '',
-			redirect_code: props.link.redirect_code?.toString() || settingsStore.defaults.redirect_code || '303',
-			keep_referrer: props.link.keep_referrer !== undefined ? props.link.keep_referrer : (settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true),
-			keep_query_params: props.link.keep_query_params !== undefined ? props.link.keep_query_params : (settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true)
+	try {
+		if (settingsStore.domains.length === 0) {
+			await settingsStore.fetchDomains()
 		}
-	} else {
-		// Creating new link - set default domain and values from settings
-		expireEnabled.value = false
-		let defaultDomain = ''
-		if (settingsStore.defaults.default_domain_id) {
-			const domain = settingsStore.domains.find(d => d.id.toString() === settingsStore.defaults.default_domain_id.toString())
-			if (domain) {
-				defaultDomain = domain.domain
+
+		if (Object.keys(settingsStore.defaults).length === 0) {
+			await settingsStore.fetchSettings()
+		}
+
+		if (props.link) {
+			const hasExpire = !!props.link.expire
+			expireEnabled.value = hasExpire
+			formData.value = {
+				domain: props.link.domain,
+				slug: props.link.slug,
+				url: props.link.url,
+				expired_url: props.link.expired_url || '',
+				expire: hasExpire ? new Date(props.link.expire).toISOString().slice(0, 16) : '',
+				comment: props.link.comment || '',
+				redirect_code: props.link.redirect_code?.toString() || settingsStore.defaults.redirect_code || '303',
+				keep_referrer: props.link.keep_referrer !== undefined ? props.link.keep_referrer : (settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true),
+				keep_query_params: props.link.keep_query_params !== undefined ? props.link.keep_query_params : (settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true)
+			}
+		} else {
+			expireEnabled.value = false
+			let defaultDomain = ''
+			if (settingsStore.defaults.default_domain_id) {
+				const domain = settingsStore.domains.find(d => d.id.toString() === settingsStore.defaults.default_domain_id.toString())
+				if (domain) {
+					defaultDomain = domain.domain
+				}
+			}
+
+			formData.value = {
+				domain: defaultDomain,
+				slug: '',
+				url: '',
+				expired_url: settingsStore.defaults.expired_url || '',
+				expire: '',
+				comment: '',
+				redirect_code: settingsStore.defaults.redirect_code || '303',
+				keep_referrer: settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true,
+				keep_query_params: settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true
 			}
 		}
-		
-		formData.value = {
-			domain: defaultDomain,
-			slug: '',
-			url: '',
-			expired_url: settingsStore.defaults.expired_url || '',
-			expire: '',
-			comment: '',
-			redirect_code: settingsStore.defaults.redirect_code || '303',
-			keep_referrer: settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true,
-			keep_query_params: settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true
+
+		initialExpireEnabled.value = expireEnabled.value
+		initialFormData.value = JSON.parse(JSON.stringify(formData.value))
+	} finally {
+		formDataReady.value = true
+		await nextTick()
+		if (slugInput.value) {
+			slugInput.value.focus()
 		}
-	}
-
-	// Store initial state for change detection
-	initialFormData.value = JSON.parse(JSON.stringify(formData.value))
-
-	// Focus on slug field
-	await nextTick()
-	if (slugInput.value) {
-		slugInput.value.focus()
 	}
 }
 
@@ -286,6 +436,7 @@ onMounted(() => {
 
 onUnmounted(() => {
 	window.removeEventListener('keydown', boundHandleEscape)
+	dismissUnsavedWarning()
 })
 
 // Re-initialize when link prop changes
@@ -325,45 +476,15 @@ function cleanUrl(url) {
 	return url
 }
 
-function validateUrl(url) {
-	if (!url) return { valid: true }
-	
-	try {
-		// Try to create a URL object to validate
-		new URL(url)
-		return { valid: true }
-	} catch (e) {
-		return { valid: false, error: 'Invalid URL format' }
-	}
-}
-
-function validateUrlHasTld(url) {
-	if (!url) return true
-	// Check if URL contains at least one TLD pattern (dot followed by non-slash, non-whitespace characters)
-	return /\.\S+/.test(url)
+function handleSlugBlur() {
+	if (skipFieldBlurCheck) return
+	checkSlug()
 }
 
 function handleUrlBlur() {
+	if (skipFieldBlurCheck) return
 	if (!formData.value.url) return
-	
-	// Clean the URL first
 	formData.value.url = cleanUrl(formData.value.url)
-	
-	// Validate URL format
-	const urlValidation = validateUrl(formData.value.url)
-	if (!urlValidation.valid) {
-		alert(urlValidation.error || 'Invalid URL format')
-		formData.value.url = ''
-		return
-	}
-	
-	// Validate TLD
-	if (!validateUrlHasTld(formData.value.url)) {
-		alert('URL must contain at least one top-level domain (e.g., .com, .org, .blabla)')
-		formData.value.url = ''
-		return
-	}
-	
 	checkUrl()
 }
 
@@ -373,42 +494,142 @@ function handleExpiredUrlBlur() {
 	}
 }
 
-async function checkUrl() {
-	if (!formData.value.url) return
-	const existing = await linksStore.checkUrl(formData.value.url)
-	if (existing.length > 0) {
-		const msg = `Found ${existing.length} existing link(s) with this URL. Create anyway?`
-		if (!confirm(msg)) {
-			formData.value.url = ''
-		}
+async function checkSlug() {
+	const domain = formData.value.domain?.trim()
+	const slug = formData.value.slug?.trim()
+	if (!domain || !slug) return
+
+	if (props.link && domain === props.link.domain && slug === props.link.slug) {
+		return
 	}
+
+	const existing = await linksStore.checkSlug(domain, slug, props.link?.id)
+	if (existing.length === 0) return
+
+	const msg =
+		existing.length === 1
+			? `Slug "${slug}" is already used on ${domain}.`
+			: `Found ${existing.length} links with slug "${slug}" on ${domain}.`
+
+	fieldHint.show({
+		anchor: slugInput.value,
+		message: msg,
+		variant: 'warning'
+	})
 }
 
-function handleSubmit() {
-	// Clean URL before validation
+async function checkUrl() {
+	if (!formData.value.url) return false
+
+	const cleaned = cleanUrl(formData.value.url)
+	if (props.link && cleaned === cleanUrl(props.link.url || '')) {
+		return false
+	}
+
+	const existing = await linksStore.checkUrl(cleaned, props.link?.id)
+	if (existing.length === 0) return false
+
+	const sorted = [...existing].sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
+	const preview = sorted.slice(0, DUPLICATE_URL_PREVIEW_LIMIT)
+	const total = existing.length
+	const message =
+		total === 1
+			? 'There is already a link that points to this URL:'
+			: `Found ${total} links with this URL:`
+
+	const seeMoreHref = router.resolve({
+		path: `/links/search/${encodeURIComponent(cleaned)}`
+	}).href
+
+	fieldHint.show({
+		anchor: urlInput.value,
+		message,
+		items: preview.map((link) => ({
+			id: link.id,
+			domain: link.domain,
+			slug: link.slug
+		})),
+		variant: 'info',
+		placement: 'right',
+		seeMoreHref,
+		seeMoreLabel: 'Details →'
+	})
+	return true
+}
+
+function resolveSaveErrorAnchor(message) {
+	const text = message.toLowerCase()
+	if (text.includes('slug')) return slugInput.value
+	if (text.includes('top-level domain')) {
+		return urlInput.value
+	}
+	if (text.includes('domain')) {
+		return formRef.value?.querySelector('.domain-slug-row select') ?? null
+	}
+	return submitButton.value
+}
+
+async function showSaveError(message) {
+	let anchor = resolveSaveErrorAnchor(message)
+
+	const tab = anchor?.closest?.('[data-tab]')?.dataset?.tab
+	if (tab && activeTab.value !== tab) {
+		activeTab.value = tab
+		await nextTick()
+		anchor = resolveSaveErrorAnchor(message)
+	}
+
+	if (!anchor) {
+		anchor = submitButton.value
+	}
+
+	anchor?.focus()
+	fieldHint.show({
+		anchor,
+		message,
+		variant: 'error'
+	})
+}
+
+async function focusFirstInvalidField(form) {
+	const firstInvalid = form.querySelector('input:invalid, select:invalid, textarea:invalid')
+	if (!firstInvalid) {
+		form.reportValidity()
+		return
+	}
+
+	const tab = firstInvalid.closest('[data-tab]')?.dataset?.tab
+	if (tab && activeTab.value !== tab) {
+		activeTab.value = tab
+		await nextTick()
+	}
+
+	firstInvalid.focus()
+	const message = firstInvalid.validationMessage || firstInvalid.title || 'Please check this field.'
+	fieldHint.show({ anchor: firstInvalid, message, variant: 'error' })
+}
+
+async function handleSubmit() {
+	if (!formDataReady.value || formSyncing.value) return
+
+	dismissUnsavedWarning()
+
 	if (formData.value.url) {
 		formData.value.url = cleanUrl(formData.value.url)
 	}
-	
-	// Validate URL format
-	const urlValidation = validateUrl(formData.value.url)
-	if (!urlValidation.valid) {
-		alert(urlValidation.error || 'Invalid URL format')
+
+	await nextTick()
+
+	const form = formRef.value
+	if (!form) return
+
+	if (!form.checkValidity()) {
+		await focusFirstInvalidField(form)
 		return
 	}
-	
-	// Validate TLD
-	if (!validateUrlHasTld(formData.value.url)) {
-		alert('URL must contain at least one top-level domain (e.g., .com, .org, .blabla)')
-		return
-	}
-	
-	// Validate expiration date if expire is enabled
-	if (expireEnabled.value && !formData.value.expire) {
-		alert('Expire date is required when expiration is enabled')
-		return
-	}
-	
+
+	await checkUrl()
+
 	const data = {
 		...formData.value,
 		expire: expireEnabled.value && formData.value.expire ? new Date(formData.value.expire).getTime() : null,
@@ -416,7 +637,22 @@ function handleSubmit() {
 		keep_referrer: formData.value.keep_referrer || false,
 		keep_query_params: formData.value.keep_query_params || false
 	}
-	emit('save', data)
+
+	formSyncing.value = true
+	fieldHint.hide()
+
+	try {
+		if (props.link) {
+			await linksStore.updateLink(props.link.id, data)
+		} else {
+			await linksStore.createLink(data)
+		}
+		emit('saved')
+	} catch (err) {
+		await showSaveError(err.message || 'Failed to save link')
+	} finally {
+		formSyncing.value = false
+	}
 }
 </script>
 
@@ -480,30 +716,5 @@ function handleSubmit() {
 	opacity: 0.6;
 }
 
-.unsaved-hint {
-	color: #f48771;
-	font-size: 0.875rem;
-	margin-bottom: 1rem;
-	text-align: right;
-	animation: fadeIn 0.2s ease-in;
-}
-
-.form-actions {
-	display: flex;
-	justify-content: flex-end;
-	align-items: center;
-	gap: 1rem;
-	margin-top: 1.5rem;
-}
-
-@keyframes fadeIn {
-	from {
-		opacity: 0;
-		transform: translateY(-5px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
 </style>
+

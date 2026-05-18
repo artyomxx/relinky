@@ -1,15 +1,11 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { spawn } from 'node:child_process'
-import { createServer } from 'node:net'
-import { setTimeout as delay } from 'node:timers/promises'
 import {
 	adminListenHost,
 	adminPassword,
 	adminServerEntry,
 	baseHost,
-	devPasswordHash,
 	pathAuthCheck,
 	pathAuthLogin,
 	pathAuthLogout,
@@ -18,10 +14,18 @@ import {
 	pathHealthcheck,
 	pathLinks,
 	pathLinksCheckUrlBase,
+	pathLinksCheckSlugBase,
 	pathLogs,
 	pathSettings,
 	pathStats
 } from './constants.js'
+import {
+	allocAdminPort,
+	buildAdminTestEnv,
+	spawnTestServer,
+	stopTestServer,
+	waitForHealth
+} from './helpers.js'
 
 const wrongPassword = 'not-the-dev-password'
 const urlValid = 'https://example.org/general-target'
@@ -30,63 +34,6 @@ const urlInvalidNoTld = 'https://no-tld-path'
 
 let child = null
 let baseUrl = ''
-
-async function getFreePort() {
-	return await new Promise((resolve, reject) => {
-		const server = createServer()
-		server.listen(0, adminListenHost, () => {
-			const address = server.address()
-			server.close(() => {
-				if (!address || typeof address === 'string') {
-					reject(new Error('Failed to allocate free port'))
-					return
-				}
-				resolve(address.port)
-			})
-		})
-		server.on('error', reject)
-	})
-}
-
-async function waitForHealth(url, timeoutMs = 15000) {
-	const started = Date.now()
-	for (;;) {
-		try {
-			const res = await fetch(`${url}${pathHealthcheck}`)
-			if (res.ok) return
-		} catch {}
-		if (Date.now() - started > timeoutMs) {
-			throw new Error('Timed out waiting for admin server healthcheck')
-		}
-		await delay(200)
-	}
-}
-
-function startAdminServer(port) {
-	child = spawn('node', [adminServerEntry], {
-		cwd: process.cwd(),
-		env: {
-			...process.env,
-			ADMIN_IP: adminListenHost,
-			ADMIN_PORT: String(port),
-			ADMIN_PASSWORD_HASH: devPasswordHash
-		},
-		stdio: 'pipe'
-	})
-	child.stdout.on('data', () => {})
-	child.stderr.on('data', () => {})
-}
-
-async function stopAdminServer() {
-	if (!child) return
-	const proc = child
-	child = null
-	proc.kill('SIGTERM')
-	await new Promise(resolve => {
-		proc.once('exit', () => resolve())
-		setTimeout(() => resolve(), 5000)
-	})
-}
 
 async function req(path, { method = 'GET', token, body } = {}) {
 	const headers = {}
@@ -136,14 +83,15 @@ function uniqueGeneralDomain() {
 }
 
 before(async () => {
-	const port = await getFreePort()
+	const port = await allocAdminPort()
 	baseUrl = `http://${adminListenHost}:${port}`
-	startAdminServer(port)
-	await waitForHealth(baseUrl)
+	child = spawnTestServer(adminServerEntry, buildAdminTestEnv(port))
+	await waitForHealth(baseUrl, { label: 'admin server', child })
 })
 
 after(async () => {
-	await stopAdminServer()
+	await stopTestServer(child)
+	child = null
 })
 
 test('healthcheck returns ok without auth', { concurrency: false }, async () => {
@@ -250,6 +198,13 @@ test('check-url requires url query parameter', { concurrency: false }, async () 
 	assert.equal(res.data?.error, 'URL parameter required')
 })
 
+test('check-slug requires domain and slug query parameters', { concurrency: false }, async () => {
+	const token = await adminLogin()
+	const res = await req(pathLinksCheckSlugBase, { token })
+	assert.equal(res.status, 400)
+	assert.equal(res.data?.error, 'Domain and slug parameters required')
+})
+
 test('admin link CRUD: create, read, list, check-url, update, duplicate slug, delete', { concurrency: false }, async () => {
 	const token = await adminLogin()
 	const domain = uniqueGeneralDomain()
@@ -295,6 +250,27 @@ test('admin link CRUD: create, read, list, check-url, update, duplicate slug, de
 	)
 	assert.equal(check.status, 200)
 	assert.ok(check.data?.links?.some(l => l.id === linkId))
+
+	const checkExcludingSelf = await req(
+		`${pathLinksCheckUrlBase}?url=${encodeURIComponent(urlValid)}&exclude_id=${linkId}`,
+		{ token }
+	)
+	assert.equal(checkExcludingSelf.status, 200)
+	assert.equal(checkExcludingSelf.data?.links?.length, 0)
+
+	const checkSlug = await req(
+		`${pathLinksCheckSlugBase}?domain=${encodeURIComponent(domain)}&slug=${encodeURIComponent(slug)}`,
+		{ token }
+	)
+	assert.equal(checkSlug.status, 200)
+	assert.ok(checkSlug.data?.links?.some(l => l.id === linkId))
+
+	const checkSlugExcludingSelf = await req(
+		`${pathLinksCheckSlugBase}?domain=${encodeURIComponent(domain)}&slug=${encodeURIComponent(slug)}&exclude_id=${linkId}`,
+		{ token }
+	)
+	assert.equal(checkSlugExcludingSelf.status, 200)
+	assert.equal(checkSlugExcludingSelf.data?.links?.length, 0)
 
 	const updated = await req(`${pathLinks}/${linkId}`, {
 		method: 'PUT',

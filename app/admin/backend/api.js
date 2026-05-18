@@ -876,6 +876,8 @@ export function setupLinkRoutes(router, auth) {
 
 		const url = new URL(req.url, 'http://localhost')
 		const checkUrl = url.searchParams.get('url')
+		const excludeIdRaw = url.searchParams.get('exclude_id')
+		const excludeId = excludeIdRaw ? parseInt(excludeIdRaw, 10) : null
 
 		if (!checkUrl) {
 			sendJson(res, 400, { error: 'URL parameter required' })
@@ -883,6 +885,7 @@ export function setupLinkRoutes(router, auth) {
 		}
 
 		const db = getRedirectablesDb()
+		const excludeSelf = excludeId != null && !Number.isNaN(excludeId)
 		const stmt = db.prepare(`
 			SELECT 
 				l.id,
@@ -894,10 +897,49 @@ export function setupLinkRoutes(router, auth) {
 			FROM links l
 			JOIN redirect_urls ru ON l.url_id = ru.id
 			JOIN domains d ON l.domain_id = d.id
-			WHERE ru.url = ?
+			WHERE ru.url = ?${excludeSelf ? ' AND l.id != ?' : ''}
 			ORDER BY l.created DESC
 		`)
-		const links = stmt.all(checkUrl)
+		const links = excludeSelf ? stmt.all(checkUrl, excludeId) : stmt.all(checkUrl)
+		db.close()
+
+		sendJson(res, 200, { links })
+	})
+
+	// Check for duplicate slug on a domain
+	router.get('/api/links/check-slug', (req, res) => {
+		if (!auth.requireAuth(req)) {
+			sendJson(res, 401, { error: 'Unauthorized' })
+			return
+		}
+
+		const url = new URL(req.url, 'http://localhost')
+		const domain = url.searchParams.get('domain')?.trim()
+		const slug = url.searchParams.get('slug')?.trim()
+		const excludeIdRaw = url.searchParams.get('exclude_id')
+		const excludeId = excludeIdRaw ? parseInt(excludeIdRaw, 10) : null
+
+		if (!domain || !slug) {
+			sendJson(res, 400, { error: 'Domain and slug parameters required' })
+			return
+		}
+
+		const db = getRedirectablesDb()
+		const excludeSelf = excludeId != null && !Number.isNaN(excludeId)
+		const stmt = db.prepare(`
+			SELECT
+				l.id,
+				l.slug,
+				l.created,
+				l.expire,
+				l.comment,
+				d.domain
+			FROM links l
+			JOIN domains d ON l.domain_id = d.id
+			WHERE d.domain = ? AND l.slug = ?${excludeSelf ? ' AND l.id != ?' : ''}
+			ORDER BY l.created DESC
+		`)
+		const links = excludeSelf ? stmt.all(domain, slug, excludeId) : stmt.all(domain, slug)
 		db.close()
 
 		sendJson(res, 200, { links })

@@ -93,8 +93,25 @@ export const useLinksStore = defineStore('links', () => {
 		await fetchLinks(pagination.value.page)
 	}
 
-	async function checkUrl(url) {
-		const response = await authStore.authedFetch(`/api/links/check-url?url=${encodeURIComponent(url)}`)
+	async function checkUrl(url, excludeId) {
+		const params = new URLSearchParams({ url })
+		if (excludeId != null) {
+			params.set('exclude_id', String(excludeId))
+		}
+		const response = await authStore.authedFetch(`/api/links/check-url?${params}`)
+
+		if (!response.ok) return []
+
+		const data = await response.json()
+		return data.links || []
+	}
+
+	async function checkSlug(domain, slug, excludeId) {
+		const params = new URLSearchParams({ domain, slug })
+		if (excludeId != null) {
+			params.set('exclude_id', String(excludeId))
+		}
+		const response = await authStore.authedFetch(`/api/links/check-slug?${params}`)
 
 		if (!response.ok) return []
 
@@ -111,7 +128,8 @@ export const useLinksStore = defineStore('links', () => {
 		createLink,
 		updateLink,
 		deleteLink,
-		checkUrl
+		checkUrl,
+		checkSlug
 	}
 })
 

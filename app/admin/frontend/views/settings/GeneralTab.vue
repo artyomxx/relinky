@@ -77,16 +77,25 @@
 		</div>
 
 		<div class="form-actions">
-			<span v-if="saveSuccess" class="success-message">Settings saved successfully</span>
-			<button type="button" @click="resetSettings" class="btn-secondary" :disabled="!hasUnsavedChanges">Reset</button>
-			<button type="button" @click="saveSettings" class="btn-primary">Save Settings</button>
+			<span
+				v-if="formStatusText"
+				class="form-status-bar"
+				:class="formStatusKind ? `form-status-bar--${formStatusKind}` : undefined"
+				role="status"
+				aria-live="polite"
+			>{{ formStatusText }}</span>
+			<button type="button" @click="resetSettings" class="btn-secondary" :disabled="!hasUnsavedChanges || saving">Reset</button>
+			<button type="button" @click="saveSettings" class="btn-primary" :disabled="saving">Save Settings</button>
 		</div>
 	</div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
 	loading: { type: Boolean, required: true },
+	saving: { type: Boolean, default: false },
 	domains: { type: Array, required: true },
 	localDefaults: { type: Object, required: true },
 	localSettings: { type: Object, required: true },
@@ -95,6 +104,20 @@ defineProps({
 	resetSettings: { type: Function, required: true },
 	saveSettings: { type: Function, required: true },
 	normalizeUrl: { type: Function, required: true }
+})
+
+const formStatusText = computed(() => {
+	if (props.saving) return 'Saving'
+	if (props.loading) return 'Loading data'
+	if (props.saveSuccess) return 'Settings saved successfully'
+	return ''
+})
+
+const formStatusKind = computed(() => {
+	if (props.saving) return 'saving'
+	if (props.loading) return 'loading'
+	if (props.saveSuccess) return 'success'
+	return ''
 })
 </script>
 
