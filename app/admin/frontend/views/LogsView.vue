@@ -191,19 +191,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.logs-view {
-	/* Uses global .view-container */
-}
-
-.header {
-	margin-bottom: 1.5rem;
-}
-
-.header h2 {
-	margin: 0;
-	color: var(--text-tertiary);
-}
-
 .filters-toolbar {
 	background: var(--bg-secondary);
 	padding: 1rem;
@@ -343,11 +330,6 @@ onMounted(() => {
 	min-width: 0;
 	overflow-wrap: anywhere;
 	word-break: break-word;
-}
-
-.log-card-summary-sep {
-	flex-shrink: 0;
-	color: var(--text-tertiary);
 }
 
 .log-card-action {
