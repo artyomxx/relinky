@@ -457,7 +457,7 @@ onMounted(() => {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
 		grid-template-rows: auto auto;
-		align-items: center;
+		align-items: start;
 		gap: 0.5rem 0.75rem;
 	}
 
@@ -465,6 +465,13 @@ onMounted(() => {
 		grid-column: 1;
 		grid-row: 1;
 		min-width: 0;
+	}
+
+	.stats-header--single-link .all-links-link {
+		grid-column: 2;
+		grid-row: 1;
+		justify-self: end;
+		align-self: start;
 	}
 
 	.stats-header--single-link .stats-period-row {
