@@ -427,15 +427,37 @@ onMounted(() => {
 
 .chart-container {
 	margin-top: 2rem;
+	min-width: 0;
 }
 
 .chart {
 	width: 100%;
-	height: 300px;
+	min-width: 0;
+}
+
+/* uPlot defaults to width: min-content, so a wide inline legend expands past .chart */
+.chart :deep(.uplot) {
+	width: 100% !important;
+	max-width: 100%;
 }
 
 .chart :deep(.u-legend) {
 	color: var(--text-secondary);
+	display: block;
+	max-width: 100%;
+}
+
+.chart :deep(.u-legend.u-inline tbody) {
+	display: block;
+	max-width: 100%;
+	text-align: center;
+}
+
+.chart :deep(.u-legend.u-inline tr) {
+	display: inline-block;
+	max-width: 100%;
+	vertical-align: top;
+	margin-right: 1rem;
 }
 
 .chart :deep(.u-axis) {
