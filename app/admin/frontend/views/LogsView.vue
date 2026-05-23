@@ -1,72 +1,62 @@
 <template>
 	<div class="logs-view">
-		<div class="header">
-			<h2>Logs</h2>
-		</div>
-
-		<div class="filters">
-			<div class="filter-row">
-				<div class="filter-group">
-					<label>Search</label>
-					<input
-						v-model="logsStore.search"
-						@input="debouncedSearch"
-						type="text"
-						placeholder="Search logs..."
-						class="search-input"
-					/>
-				</div>
-
-				<div class="filter-group">
-					<label>Start Date</label>
-					<input
-						v-model="logsStore.startDate"
-						@change="logsStore.fetchLogs(1)"
-						type="date"
-					/>
-				</div>
-
-				<div class="filter-group">
-					<label>End Date</label>
-					<input
-						v-model="logsStore.endDate"
-						@change="logsStore.fetchLogs(1)"
-						type="date"
-					/>
-				</div>
+		<div class="filters-toolbar">
+			<input
+				v-model="logsStore.search"
+				@input="debouncedSearch"
+				type="text"
+				placeholder="Search logs..."
+				class="filter-field filter-search"
+			/>
+			<div class="filter-dates">
+				<span class="filter-dates-label">Date range:</span>
+				<input
+					v-model="logsStore.startDate"
+					@change="logsStore.fetchLogs(1)"
+					type="date"
+					class="filter-field"
+					aria-label="Date range start"
+				/>
+				<span>-</span>
+				<input
+					v-model="logsStore.endDate"
+					@change="logsStore.fetchLogs(1)"
+					type="date"
+					class="filter-field"
+					aria-label="Date range end"
+				/>
 			</div>
-
-			<div class="filter-row">
-				<div class="filter-group">
-					<label>Event Type</label>
-					<select v-model="logsStore.eventType" @change="logsStore.fetchLogs(1)">
-						<option value="all">All</option>
-						<option value="main">Main</option>
-						<option value="domain">Domain</option>
-						<option value="link">Link</option>
-					</select>
-				</div>
-
-				<div class="filter-group">
-					<label>Action</label>
-					<select v-model="logsStore.action" @change="logsStore.fetchLogs(1)">
-						<option value="">All Actions</option>
-						<option v-for="act in logsStore.actions" :key="act" :value="act">
-							{{ act }}
-						</option>
-					</select>
-				</div>
-
-				<div class="filter-group">
-					<label>Sort Order</label>
-					<select v-model="logsStore.sortOrder" @change="logsStore.fetchLogs(1)">
-						<option value="desc">Newest First</option>
-						<option value="asc">Oldest First</option>
-					</select>
-				</div>
-
-					<button @click="logsStore.resetFilters()" class="btn-secondary">Reset Filters</button>
-			</div>
+			<select
+				v-model="logsStore.eventType"
+				@change="logsStore.fetchLogs(1)"
+				class="filter-field filter-event-type"
+			>
+				<option value="all">All events</option>
+				<option value="main">Main events</option>
+				<option value="domain">Domain events</option>
+				<option value="link">Link events</option>
+			</select>
+			<select
+				v-model="logsStore.action"
+				@change="logsStore.fetchLogs(1)"
+				class="filter-field filter-action"
+			>
+				<option value="">All actions</option>
+				<option v-for="act in logsStore.actions" :key="act" :value="act">
+					{{ act.charAt(0).toUpperCase() + act.slice(1) }}
+				</option>
+			</select>
+			<select
+				v-model="logsStore.sortOrder"
+				@change="logsStore.fetchLogs(1)"
+				class="filter-field filter-sort"
+			>
+				<option value="desc">Newest first</option>
+				<option value="asc">Oldest first</option>
+			</select>
+			<button type="button" @click="logsStore.resetFilters()" class="btn-secondary filter-reset">
+				Reset filters
+			</button>
 		</div>
 
 				<div class="logs-content" :class="{ 'loading-overlay': logsStore.loading }">
@@ -192,42 +182,90 @@ onMounted(() => {
 	color: var(--text-tertiary);
 }
 
-.filters {
+.filters-toolbar {
 	background: var(--bg-tertiary);
 	padding: 1rem;
 	border-radius: 4px;
 	margin-bottom: 1.5rem;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.75rem;
+	align-items: center;
 }
 
-.filter-row {
-	display: flex;
-	gap: 1rem;
-	margin-bottom: 1rem;
-}
-
-.filter-row:last-child {
-	margin-bottom: 0;
-}
-
-.filter-group {
-	flex: 1;
-	min-width: 150px;
-}
-
-.filter-group label {
-	display: block;
-	margin-bottom: 0.5rem;
-	font-size: 0.875rem;
-	color: var(--text-primary);
-}
-
-.filter-group input,
-.filter-group select {
+.filter-field,
+.filter-reset {
+	min-width: 0;
 	width: 100%;
 }
 
-.search-input {
-	flex: 2;
+.filter-search {
+	grid-column: 1 / -1;
+}
+
+.filter-dates {
+	grid-column: 1 / -1;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.filter-dates-label {
+	flex-shrink: 0;
+	font-size: 0.875rem;
+	color: var(--text-secondary);
+	white-space: nowrap;
+}
+
+.filter-dates .filter-field {
+	flex: 1;
+	min-width: 0;
+	width: auto;
+}
+
+@media (min-width: 641px) {
+	.filters-toolbar {
+		grid-template-columns: auto repeat(4, minmax(0, 1fr));
+		gap: 1rem;
+	}
+
+	.filter-search {
+		grid-column: 1 / -1;
+		grid-row: 1;
+	}
+
+	.filter-dates {
+		grid-column: 1;
+		grid-row: 2;
+		gap: 0.35rem;
+	}
+
+	.filter-dates .filter-field {
+		flex: 0 0 auto;
+		width: 7.25rem;
+		max-width: 7.25rem;
+	}
+
+	.filter-event-type {
+		grid-column: 2;
+		grid-row: 2;
+	}
+
+	.filter-action {
+		grid-column: 3;
+		grid-row: 2;
+	}
+
+	.filter-sort {
+		grid-column: 4;
+		grid-row: 2;
+	}
+
+	.filter-reset {
+		grid-column: 5;
+		grid-row: 2;
+	}
 }
 
 /* Button styles use global classes */
