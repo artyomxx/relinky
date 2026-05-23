@@ -1,6 +1,6 @@
 <template>
-	<div class=links-view>
-		<div class=links-toolbar>
+	<div class="links-view mobile-view-shell">
+		<div class="links-toolbar mobile-view-toolbar">
 			<input
 				v-model="linksStore.search"
 				@input="debouncedSearch"
@@ -353,7 +353,6 @@ onUnmounted(() => {
 	align-items: center;
 	gap: 1rem;
 	padding: 1rem;
-	margin-bottom: 1.5rem;
 	background: var(--bg-secondary);
 	border-radius: 8px;
 }
@@ -521,15 +520,9 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
-	.links-view {
-		padding: 0 1rem 0.75rem;
-	}
-
 	.links-toolbar {
 		flex-direction: column;
 		align-items: stretch;
-		margin-top: 1rem;
-		margin-bottom: 1rem;
 	}
 
 	.links-toolbar-search,
@@ -605,6 +598,12 @@ onUnmounted(() => {
 	.pagination {
 		flex-wrap: wrap;
 		gap: 0.5rem;
+	}
+}
+
+@media (min-width: 641px) {
+	.links-toolbar {
+		margin-bottom: 1.5rem;
 	}
 }
 </style>

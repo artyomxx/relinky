@@ -230,6 +230,20 @@ a.link-small {
 	border-radius: 8px;
 }
 
+/* Shared mobile shell for links, logs, and stats list views */
+@media (max-width: 640px) {
+	.mobile-view-shell {
+		padding: 0 1rem 0.75rem;
+		min-width: 0;
+	}
+
+	.mobile-view-toolbar,
+	.view-header.mobile-view-toolbar {
+		margin-top: 1rem;
+		margin-bottom: 1rem;
+	}
+}
+
 /* Global header styles */
 .view-header {
 	display: flex;

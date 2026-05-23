@@ -1,6 +1,6 @@
 <template>
-	<div class="stats-view view-container">
-		<div class="view-header stats-header" :class="{ 'stats-header--single-link': linkId }">
+	<div class="stats-view view-container mobile-view-shell">
+		<div class="view-header stats-header mobile-view-toolbar" :class="{ 'stats-header--single-link': linkId }">
 			<div v-if="linkId && currentLink" class=stats-title>
 				Stats for <u>{{ currentLink.domain }}/{{ currentLink.slug }}</u>
 			</div>
@@ -438,14 +438,8 @@ onMounted(() => {
 
 @media (max-width: 640px) {
 	.stats-view.view-container {
-		padding: 0 1rem 0.75rem;
 		border-radius: 0;
 		background: transparent;
-	}
-
-	.stats-header {
-		margin-top: 1rem;
-		margin-bottom: 1rem;
 	}
 
 	.stats-header .stats-period-row {

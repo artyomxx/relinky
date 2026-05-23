@@ -1,6 +1,6 @@
 <template>
-	<div class="logs-view">
-		<div class="filters-toolbar">
+	<div class="logs-view mobile-view-shell">
+		<div class="filters-toolbar mobile-view-toolbar">
 			<input
 				v-model="logsStore.search"
 				@input="debouncedSearch"
@@ -195,7 +195,6 @@ onMounted(() => {
 	background: var(--bg-secondary);
 	padding: 1rem;
 	border-radius: 8px;
-	margin-bottom: 1.5rem;
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 0.75rem;
@@ -233,19 +232,9 @@ onMounted(() => {
 	width: auto;
 }
 
-@media (max-width: 640px) {
-	.logs-view {
-		padding: 0 1rem 0.75rem;
-	}
-
-	.filters-toolbar {
-		margin-top: 1rem;
-		margin-bottom: 1rem;
-	}
-}
-
 @media (min-width: 641px) {
 	.filters-toolbar {
+		margin-bottom: 1.5rem;
 		grid-template-columns: auto repeat(4, minmax(0, 1fr));
 		gap: 1rem;
 	}
