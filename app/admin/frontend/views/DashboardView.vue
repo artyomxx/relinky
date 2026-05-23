@@ -17,7 +17,8 @@
 					<router-link to="/links" class="nav-link borderless">Links</router-link>
 					<router-link to="/stats" class="nav-link borderless">Stats</router-link>
 					<router-link to="/logs" class="nav-link borderless">Logs</router-link>
-					<router-link to="/settings" class="nav-link borderless">Settings</router-link>
+					<router-link to="/domains" class="nav-link borderless">Domains</router-link>
+					<router-link to="/tools" class="nav-link borderless">Tools</router-link>
 					<button type="button" @click="handleLogout" class="nav-link borderless">Logout</button>
 				</nav>
 			</div>
@@ -45,7 +46,8 @@ const currentNavLabel = computed(() => {
 	if (path.startsWith('/links')) return 'Links'
 	if (path.startsWith('/stats')) return 'Stats'
 	if (path.startsWith('/logs')) return 'Logs'
-	if (path.startsWith('/settings')) return 'Settings'
+	if (path.startsWith('/domains')) return 'Domains'
+	if (path.startsWith('/tools')) return 'Tools'
 	return 'Links'
 })
 
