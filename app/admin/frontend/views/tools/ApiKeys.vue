@@ -1,15 +1,10 @@
 <template>
-	<div class="tab-content settings-tab" :class="{ 'loading-overlay': loading }">
-		<div class="settings-tab-header">
-			<h3 class="settings-tab-title">API Keys</h3>
-		</div>
-
-		<div class="api-keys-section">
-			<div class="settings-card api-key-create-card">
-				<h4>Create key</h4>
+	<div class="api-keys" :class="{ 'loading-overlay': loading }">
+		<div class="api-keys-panel">
+			<div class="settings-card api-keys-create">
 				<div class="api-create-row">
 					<div class="api-create-field">
-						<label>Key Name</label>
+						<label>Key name</label>
 						<input v-model="newApiKeyNameModel" type="text" placeholder="CI automation" />
 					</div>
 					<div class="api-create-field api-create-field-grow">
@@ -24,34 +19,31 @@
 				</div>
 			</div>
 
-			<div class="settings-card api-key-list-card">
-				<h4>Existing keys</h4>
-				<div class="api-key-list">
-					<div v-for="key in apiKeys" :key="key.id" class="api-key-item">
-						<div class="api-key-item-content">
-							<div class="api-key-meta">
-								<div><strong>{{ key.name }}</strong> <code>{{ key.key_id }}</code></div>
-								<div class="api-muted">
-									Created: {{ formatTs(key.created) }} | Last used: {{ formatTs(key.last_used_at) }} {{ key.last_used_ip ? `(${key.last_used_ip})` : '' }}
-								</div>
-								<div class="api-muted">Allowed IPs: {{ key.allowed_ips?.length ? key.allowed_ips.join(', ') : 'any' }}</div>
+			<div class="api-keys-rows">
+				<div v-for="key in apiKeys" :key="key.id" class="api-key-row">
+					<div class="api-key-row-main">
+						<div class="api-key-meta">
+							<div><strong>{{ key.name }}</strong> <code>{{ key.key_id }}</code></div>
+							<div class="api-muted">
+								Created: {{ formatTs(key.created) }} | Last used: {{ formatTs(key.last_used_at) }} {{ key.last_used_ip ? `(${key.last_used_ip})` : '' }}
 							</div>
-							<div class="api-key-actions">
-								<button type="button" class="btn-secondary" @click="handleToggleApiKey(key)">
-									{{ key.enabled ? 'Disable' : 'Enable' }}
-								</button>
-								<button type="button" class="btn-secondary" @click="handleRegenerateApiKey(key)">Regenerate</button>
-								<button type="button" class="btn-danger" @click="handleDeleteApiKey(key)">Delete</button>
-							</div>
+							<div class="api-muted">Allowed IPs: {{ key.allowed_ips?.length ? key.allowed_ips.join(', ') : 'any' }}</div>
 						</div>
-						<div v-if="lastGeneratedApiToken && key.id === lastGeneratedApiKeyId" class="api-token-inline">
-							<span class="api-token-inline-label">Copy now, you won't see it again:</span>
-							<input type="text" readonly :value="lastGeneratedApiToken" />
-							<button type="button" class="btn-secondary" @click="copyApiToken">{{ copyButtonText }}</button>
+						<div class="api-key-actions">
+							<a class="link-small link-white" @click.prevent="handleToggleApiKey(key)">
+								{{ key.enabled ? 'Disable' : 'Enable' }}
+							</a>
+							<a class="link-small link-white" @click.prevent="handleRegenerateApiKey(key)">Regenerate</a>
+							<a class="link-danger link-small" @click.prevent="handleDeleteApiKey(key)">Delete</a>
 						</div>
 					</div>
-					<div v-if="apiKeys.length === 0" class="empty">No API keys yet</div>
+					<div v-if="lastGeneratedApiToken && key.id === lastGeneratedApiKeyId" class="api-token-inline">
+						<span class="api-token-inline-label">Copy now, you won't see it again:</span>
+						<input type="text" readonly :value="lastGeneratedApiToken" />
+						<button type="button" class="btn-secondary" @click="copyApiToken">{{ copyButtonText }}</button>
+					</div>
 				</div>
+				<div v-if="apiKeys.length === 0" class="empty">No API keys yet</div>
 			</div>
 		</div>
 	</div>
@@ -130,7 +122,7 @@ async function copyApiToken() {
 </script>
 
 <style scoped>
-.api-keys-section {
+.api-keys-panel {
 	margin: 0;
 	display: flex;
 	flex-direction: column;
@@ -170,28 +162,24 @@ async function copyApiToken() {
 	flex-shrink: 0;
 }
 
-.api-key-create-card h4,
-.api-key-list-card h4 {
-	margin: 0 0 1rem 0;
+.api-keys-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	min-width: 0;
 }
 
-.api-key-list {
+.api-key-row {
 	display: flex;
 	flex-direction: column;
 	gap: 0.75rem;
+	padding: 0.75rem 1rem;
+	background: var(--bg-tertiary);
+	border-radius: 8px;
+	min-width: 0;
 }
 
-.api-key-item {
-	display: flex;
-	flex-direction: column;
-	align-items: stretch;
-	gap: 0.75rem;
-	padding: 0.75rem;
-	border: 1px solid var(--bg-border);
-	border-radius: 6px;
-}
-
-.api-key-item-content {
+.api-key-row-main {
 	display: flex;
 	justify-content: space-between;
 	align-items: flex-start;
@@ -205,10 +193,11 @@ async function copyApiToken() {
 
 .api-key-actions {
 	display: flex;
-	gap: 0.5rem;
+	gap: 0.75rem;
 	flex-wrap: wrap;
 	flex-shrink: 0;
 	justify-content: flex-end;
+	align-items: center;
 }
 
 .api-token-inline {
@@ -235,13 +224,18 @@ async function copyApiToken() {
 	.api-create-row {
 		flex-direction: column;
 		align-items: stretch;
+		gap: 0.75rem;
+	}
+
+	.api-create-field-grow {
+		flex: none;
 	}
 
 	.api-create-actions {
 		align-self: flex-start;
 	}
 
-	.api-key-item-content {
+	.api-key-row-main {
 		flex-direction: column;
 		align-items: stretch;
 	}

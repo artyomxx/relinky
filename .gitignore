@@ -7,3 +7,4 @@ app/admin/frontend/dist/
 .DS_Store
 *.log
 .not-in-git/
+.cursor

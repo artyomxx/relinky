@@ -1,148 +1,84 @@
 <template>
-	<div class="stats-view view-container">
-		<div class="header view-header">
-			<div class="header-left view-header-left">
-				<h2 v-if="linkId && currentLink" class="link-title">
-					Stats for: {{ currentLink.domain }}/{{ currentLink.slug }}
-				</h2>
-				<select v-model="selectedPeriod" @change="updateStats">
-					<option value="day">24 hours</option>
-					<option value="week">7 days</option>
-					<option value="month">Month</option>
-					<option value="year">Year</option>
-					<option value="all">All Time</option>
+	<div class="stats-view view-container mobile-view-shell">
+		<div class="view-header stats-header mobile-view-toolbar" :class="{ 'stats-header--single-link': linkId }">
+			<div v-if="linkId && currentLink" class=stats-title>
+				Stats for <u>{{ currentLink.domain }}/{{ currentLink.slug }}</u>
+			</div>
+			<div class=stats-period-row>
+				<select v-model="selectedPeriod" @change="updateStats" class=stats-period-select>
+					<option v-for="opt in periodOptions" :key="opt.value" :value="opt.value">
+						{{ opt.label }}
+					</option>
 				</select>
-			</div>
-			<div class="header-right view-header-right">
-				<router-link v-if="linkId" to="/stats" class="all-links-link">All Links</router-link>
-			</div>
-		</div>
-
-		<div v-if="statsStore.stats" class="stats-content" :class="{ 'loading-overlay': statsStore.loading }">
-			<!-- Single link view - simplified list -->
-			<div v-if="linkId" class="link-stats-simple">
-				<div class="link-stats-main">
-					<div class="stat-row-compact">
-						<span class="stat-label-compact">Current period:</span>
-						<span class="stat-value-compact">{{ statsStore.stats.totalClicks }}</span>
-					</div>
-					<div class="stat-row-compact">
-						<span class="stat-label-compact">Previous period:</span>
-						<span class="stat-value-compact">{{ statsStore.stats.prevTotalClicks }}</span>
-					</div>
-					<div class="stat-row-compact">
-						<span class="stat-label-compact">Difference:</span>
-						<span 
-							class="stat-value-compact" 
-							:class="{ 
-								'stat-positive': statsStore.stats.totalClicks > statsStore.stats.prevTotalClicks,
-								'stat-negative': statsStore.stats.prevTotalClicks > statsStore.stats.totalClicks
-							}"
-						>
-							{{ statsStore.stats.totalClicks - statsStore.stats.prevTotalClicks > 0 ? '+' : '' }}{{ statsStore.stats.totalClicks - statsStore.stats.prevTotalClicks }}
-						</span>
-					</div>
-				</div>
-				<div class="link-stats-list">
-					<h3>Devices</h3>
-					<ul class="stats-list">
-						<li v-for="device in statsStore.stats.topDevices" :key="device.name">
-							{{ device.name }} - {{ device.count }}
-						</li>
-						<li v-if="statsStore.stats.topDevices.length === 0" class="empty">No devices yet</li>
-					</ul>
-				</div>
-				<div class="link-stats-list">
-					<h3>OS</h3>
-					<ul class="stats-list">
-						<li v-for="os in statsStore.stats.topOSes" :key="os.name">
-							{{ os.name }} - {{ os.count }}
-						</li>
-						<li v-if="statsStore.stats.topOSes.length === 0" class="empty">No OS data yet</li>
-					</ul>
-				</div>
-				<div class="link-stats-list">
-					<h3>Top Referrals</h3>
-					<ul class="stats-list">
-						<li v-for="ref in statsStore.stats.topReferrals" :key="ref.name">
-							{{ ref.name }} - {{ ref.count }}
-						</li>
-						<li v-if="statsStore.stats.topReferrals.length === 0" class="empty">No referrals yet</li>
-					</ul>
-				</div>
-			</div>
-
-			<!-- All links view - original layout -->
-			<div v-else class="stats-row">
-				<div class="summary-small">
-					<div class="stat-value-small">{{ statsStore.stats.totalClicks }} clicks</div>
-					<div class="stat-delta-small">
-						Previous period: {{ statsStore.stats.prevTotalClicks }}
-					</div>
-					<div 
-						class="stat-delta-small" 
-						:class="{ 
+				<div v-if=statsStore.stats class=summary-small>
+					<span class=stat-value-small>{{ statsStore.stats.totalClicks }} clicks</span>
+					<span
+						v-if="statsStore.stats.totalClicks - statsStore.stats.prevTotalClicks != 0"
+						class=stat-delta-small
+						:class="{
 							'stat-positive': statsStore.stats.totalClicks > statsStore.stats.prevTotalClicks,
 							'stat-negative': statsStore.stats.prevTotalClicks > statsStore.stats.totalClicks
 						}"
 					>
-						Difference: {{ statsStore.stats.totalClicks - statsStore.stats.prevTotalClicks > 0 ? '+' : '' }}{{ statsStore.stats.totalClicks - statsStore.stats.prevTotalClicks }}
-					</div>
+						{{ statsStore.stats.totalClicks - statsStore.stats.prevTotalClicks > 0 ? '+' : '' }}{{ statsStore.stats.totalClicks - statsStore.stats.prevTotalClicks }}
+						from {{ statsStore.stats.prevTotalClicks }}
+					</span>
 				</div>
+			</div>
+			<router-link v-if=linkId to=/stats class=all-links-link>All links →</router-link>
+		</div>
 
-				<div class="top-section">
-					<h3>Top Links</h3>
+		<div v-if="statsStore.stats" class="stats-content" :class="{ 'loading-overlay': statsStore.loading }">
+			<div class=stats-tops :class="{ 'stats-tops--single-link': linkId }">
+				<div v-if="!linkId" class="top-section top-section--links">
+					<label>Top Links</label>
 					<ul class="scrollable-list">
-					<li v-for="link in statsStore.stats.topLinks" :key="link.slug">
-						<router-link 
-							:to="`/stats/link/${link.id}`"
-							@mousemove="updatePopoverPosition($event, `link-${link.id}`)"
-							@mouseenter="showPopover(`link-${link.id}`)"
-							@mouseleave="hidePopover(`link-${link.id}`)"
-							style="position: relative;"
-						>
-							{{ link.domain }}/{{ link.slug }}
-							<Popover
-								text="See stats for this link"
-								:visible="visiblePopovers.has(`link-${link.id}`)"
-								:x="popoverPositions[`link-${link.id}`]?.x || 0"
-								:y="popoverPositions[`link-${link.id}`]?.y || 0"
-							/>
-						</router-link>
-						- {{ link.count }}
-					</li>
+						<li v-for="link in statsStore.stats.topLinks" :key="link.slug">
+							<router-link
+								:to="`/stats/link/${link.id}`"
+								@mousemove="handleHoverMove($event, `link-${link.id}`)"
+								@mouseenter="handleHoverEnter($event, `link-${link.id}`)"
+								@mouseleave="handleHoverLeave(`link-${link.id}`)"
+								@click="dismissHint(`link-${link.id}`)"
+							>
+								{{ link.domain }}/{{ link.slug }}
+							</router-link>
+							- {{ link.count }}
+						</li>
 						<li v-if="statsStore.stats.topLinks.length === 0" class="empty">No links yet</li>
 					</ul>
 				</div>
 
-				<div class="top-section">
-					<h3>Top Devices</h3>
-					<ul class="scrollable-list">
-						<li v-for="device in statsStore.stats.topDevices" :key="device.name">
-							{{ device.name }} - {{ device.count }}
-						</li>
-						<li v-if="statsStore.stats.topDevices.length === 0" class="empty">No devices yet</li>
-					</ul>
-				</div>
-
-				<div class="top-section">
-					<h3>Top OS</h3>
-					<ul class="scrollable-list">
-						<li v-for="os in statsStore.stats.topOSes" :key="os.name">
-							{{ os.name }} - {{ os.count }}
-						</li>
-						<li v-if="statsStore.stats.topOSes.length === 0" class="empty">No OS data yet</li>
-					</ul>
-				</div>
-
-				<div class="top-section">
-					<h3>Top Referrals</h3>
+				<div class="top-section top-section--referrals">
+					<label>Top Referrals</label>
 					<ul class="scrollable-list">
 						<li v-for="ref in statsStore.stats.topReferrals" :key="ref.name">
 							{{ ref.name }} - {{ ref.count }}
 						</li>
 						<li v-if="statsStore.stats.topReferrals.length === 0" class="empty">No referrals yet</li>
 					</ul>
+				</div>
+
+				<div class="stats-tops-mini">
+					<div class="top-section top-section--devices">
+						<label>Top Devices</label>
+						<ul class="scrollable-list">
+							<li v-for="device in statsStore.stats.topDevices" :key="device.name">
+								{{ device.name }} - {{ device.count }}
+							</li>
+							<li v-if="statsStore.stats.topDevices.length === 0" class="empty">No devices yet</li>
+						</ul>
+					</div>
+
+					<div class="top-section top-section--os">
+						<label>Top OS</label>
+						<ul class="scrollable-list">
+							<li v-for="os in statsStore.stats.topOSes" :key="os.name">
+								{{ os.name }} - {{ os.count }}
+							</li>
+							<li v-if="statsStore.stats.topOSes.length === 0" class="empty">No OS data yet</li>
+						</ul>
+					</div>
 				</div>
 			</div>
 
@@ -151,6 +87,12 @@
 				<div ref="chartContainer" class="chart"></div>
 			</div>
 		</div>
+
+		<PointerHint
+			:visible="hint.visible"
+			:style="hintStyle"
+			:value="getTopLinkHintValue(hint.activeId)"
+		/>
 	</div>
 </template>
 
@@ -160,18 +102,32 @@ import { useRoute } from 'vue-router'
 import { useStatsStore } from '../stores/stats.js'
 import { useAuthStore } from '../stores/auth.js'
 import uPlot from 'uplot'
-import Popover from '../components/Popover.vue'
+import PointerHint from '../components/PointerHint.vue'
+import { usePointerHint } from '../composables/usePointerHint.js'
 import { formatDateYMD } from '../utils/date.js'
 
 const route = useRoute()
 const statsStore = useStatsStore()
 const authStore = useAuthStore()
 const selectedPeriod = ref('week')
+const periodOptions = [
+	{ value: 'day', label: '24 hours' },
+	{ value: 'week', label: '7 days' },
+	{ value: 'month', label: 'Month' },
+	{ value: 'year', label: 'Year' },
+	{ value: 'all', label: 'All Time' }
+]
 const chartContainer = ref(null)
 const currentLink = ref(null)
-const popoverPositions = ref({})
-const visiblePopovers = ref(new Set())
+const { hint, hintStyle, handleHoverEnter, handleHoverMove, handleHoverLeave, dismissHint } = usePointerHint()
 let chart = null
+
+function getTopLinkHintValue(id) {
+	const rawId = parseInt(String(id || '').replace(/^link-/, ''), 10)
+	if (!Number.isFinite(rawId) || !statsStore.stats?.topLinks) return ''
+	const link = statsStore.stats.topLinks.find(item => item.id === rawId)
+	return link ? `Open stats for ${link.domain}/${link.slug}` : ''
+}
 
 // Check if viewing link-specific stats
 const linkId = computed(() => {
@@ -293,27 +249,10 @@ watch(() => statsStore.stats, () => {
 })
 
 watch(() => linkId.value, () => {
+	dismissHint()
 	fetchLinkInfo()
 	updateStats()
 }, { immediate: true })
-
-function showPopover(id) {
-	visiblePopovers.value.add(id)
-}
-
-function hidePopover(id) {
-	visiblePopovers.value.delete(id)
-}
-
-function updatePopoverPosition(event, id) {
-	if (!visiblePopovers.value.has(id)) return
-	
-	const rect = event.currentTarget.getBoundingClientRect()
-	const x = event.clientX - rect.left
-	const y = event.clientY - rect.top
-	
-	popoverPositions.value[id] = { x, y }
-}
 
 onMounted(() => {
 	fetchLinkInfo()
@@ -323,70 +262,89 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.stats-view {
-	/* Uses global .view-container */
+.stats-header {
+	flex-wrap: wrap;
 }
 
-.header {
-	/* Uses global .view-header */
-}
-
-.header-left {
-	/* Uses global .view-header-left */
-}
-
-.header-right {
-	/* Uses global .view-header-right */
-}
-
-.link-title {
-	/* Uses global .view-title */
+.stats-title {
+	flex-shrink: 0;
+	font-weight: bold;
 }
 
 .all-links-link {
+	flex-shrink: 0;
 	text-decoration: underline;
-	cursor: pointer;
 }
 
-.stats-row {
+.stats-period-row {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0.5rem;
+	flex: 1;
+	min-width: 0;
+}
+
+.stats-period-select {
+	flex-shrink: 0;
+	width: auto;
+}
+
+.stats-tops {
 	display: grid;
-	grid-template-columns: auto 1fr 1fr 1fr 1fr;
+	grid-template-columns: minmax(0, 7fr) minmax(0, 7fr) minmax(0, 3fr) minmax(0, 3fr);
 	gap: 1.5rem;
 	margin-bottom: 2rem;
 	align-items: start;
 }
 
+.stats-tops-mini {
+	display: contents;
+}
+
+.stats-tops--single-link {
+	grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+}
+
+.stats-tops--single-link .stats-tops-mini {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1.5rem;
+}
+
 .summary-small {
-	padding: 1rem;
+	flex: 1;
+	min-width: 0;
+	padding: 0.5rem 0.65rem;
 	background: var(--bg-tertiary);
 	border-radius: 8px;
-	text-align: center;
-	min-width: 150px;
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: baseline;
+	gap: 0.35rem;
 }
 
 .stat-value-small {
-	font-size: 1.5rem;
-	font-weight: bold;
+	flex-shrink: 0;
+	white-space: nowrap;
 }
 
-.stat-value-small.stat-positive {
+.stat-positive {
 	color: var(--accent-info);
 }
 
-.stat-value-small.stat-negative {
+.stat-negative {
 	color: var(--accent-error);
 }
 
-.stat-label-small {
-	color: var(--text-secondary);
-	margin-top: 0.5rem;
-	font-size: 0.875rem;
-}
-
 .stat-delta-small {
-	margin-top: 0.5rem;
-	font-size: 0.75rem;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	color: var(--text-secondary);
+	font-style: italic;
 }
 
 .stat-delta-small.stat-positive {
@@ -397,15 +355,17 @@ onMounted(() => {
 	color: var(--accent-error);
 }
 
-.tops {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-	gap: 1.5rem;
-	margin-bottom: 2rem;
+.top-section {
+	background: var(--bg-tertiary);
+	padding: 1rem;
+	border-radius: 8px;
+	min-width: 0;
 }
 
-.top-section h3 {
+.top-section label {
+	display: block;
 	margin: 0 0 1rem 0;
+	font-weight: 600;
 }
 
 .top-section ul {
@@ -431,15 +391,37 @@ onMounted(() => {
 
 .chart-container {
 	margin-top: 2rem;
+	min-width: 0;
 }
 
 .chart {
 	width: 100%;
-	height: 300px;
+	min-width: 0;
+}
+
+/* uPlot defaults to width: min-content, so a wide inline legend expands past .chart */
+.chart :deep(.uplot) {
+	width: 100% !important;
+	max-width: 100%;
 }
 
 .chart :deep(.u-legend) {
 	color: var(--text-secondary);
+	display: block;
+	max-width: 100%;
+}
+
+.chart :deep(.u-legend.u-inline tbody) {
+	display: block;
+	max-width: 100%;
+	text-align: center;
+}
+
+.chart :deep(.u-legend.u-inline tr) {
+	display: inline-block;
+	max-width: 100%;
+	vertical-align: top;
+	margin-right: 1rem;
 }
 
 .chart :deep(.u-axis) {
@@ -454,117 +436,66 @@ onMounted(() => {
 	fill: var(--text-secondary);
 }
 
-/* Loading overlay uses global class */
+@media (max-width: 640px) {
+	.stats-view.view-container {
+		border-radius: 0;
+		background: transparent;
+	}
 
-.link-stats-simple {
-	display: grid;
-	grid-template-columns: 300px repeat(3, 1fr);
-	gap: 1.5rem;
-	margin-bottom: 2rem;
-}
+	.stats-header .stats-period-row {
+		flex: 1 1 100%;
+		width: 100%;
+	}
 
-.link-stats-main {
-	background: var(--bg-tertiary);
-	padding: 1rem;
-	border-radius: 8px;
-}
+	.stats-header--single-link {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-rows: auto auto;
+		align-items: start;
+		gap: 0.5rem 0.75rem;
+	}
 
-.link-stats-list {
-	background: var(--bg-tertiary);
-	padding: 1rem;
-	border-radius: 8px;
-	display: flex;
-	flex-direction: column;
-}
+	.stats-header--single-link .stats-title {
+		grid-column: 1;
+		grid-row: 1;
+		min-width: 0;
+	}
 
-.link-stats-list h3 {
-	margin: 0 0 0.75rem 0;
-	font-size: 1rem;
-	color: var(--text-primary);
-}
+	.stats-header--single-link .all-links-link {
+		grid-column: 2;
+		grid-row: 1;
+		justify-self: end;
+		align-self: start;
+	}
 
-.stats-list {
-	list-style: none;
-	padding: 0;
-	margin: 0;
-	overflow-y: auto;
-	flex: 1;
-}
+	.stats-header--single-link .stats-period-row {
+		grid-column: 1 / -1;
+		grid-row: 2;
+	}
 
-.stats-list li {
-	padding: 0.5rem 0;
-	color: var(--text-primary);
-	border-bottom: 1px solid var(--bg-border);
-	font-size: 0.875rem;
-}
+	.stats-tops,
+	.stats-tops.stats-tops--single-link {
+		grid-template-columns: 1fr;
+		gap: 1rem;
+		margin-top: 0;
+		margin-bottom: 1rem;
+	}
 
-.stats-list li:last-child {
-	border-bottom: none;
-}
+	.stats-tops-mini,
+	.stats-tops--single-link .stats-tops-mini {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
 
-.stats-list li.empty {
-	color: var(--text-secondary);
-	text-align: center;
-	padding: 1rem;
-	border-bottom: none;
-}
+	.top-section ul.scrollable-list {
+		height: auto;
+		max-height: 12rem;
+	}
 
-.stat-row-compact {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: 0.5rem 0;
-	border-bottom: 1px solid var(--bg-border);
-}
-
-.stat-row-compact:last-of-type {
-	border-bottom: 1px solid var(--bg-border);
-	margin-bottom: 0.75rem;
-}
-
-.stat-section-compact {
-	margin-top: 0.75rem;
-}
-
-.stat-label-compact {
-	color: var(--text-secondary);
-	font-size: 0.875rem;
-}
-
-.stat-value-compact {
-	color: var(--text-primary);
-	font-size: 0.875rem;
-}
-
-.stat-value-compact.stat-positive {
-	color: var(--accent-info);
-}
-
-.stat-value-compact.stat-negative {
-	color: var(--accent-error);
-}
-
-.stat-list-compact {
-	list-style: none;
-	padding: 0;
-	margin: 0.5rem 0 0 0;
-}
-
-.stat-list-compact li {
-	padding: 0.375rem 0;
-	color: var(--text-primary);
-	font-size: 0.875rem;
-	border-bottom: 1px solid var(--bg-border);
-}
-
-.stat-list-compact li:last-child {
-	border-bottom: none;
-}
-
-.stat-list-compact li.empty {
-	color: var(--text-secondary);
-	text-align: center;
-	padding: 0.5rem;
-	border-bottom: none;
+	.summary-small,
+	.top-section {
+		background: var(--bg-secondary);
+	}
 }
 </style>

@@ -1,17 +1,17 @@
 <template>
-	<div class="links-view view-container">
-		<div class="header view-header">
+	<div class="links-view mobile-view-shell">
+		<div class="links-toolbar mobile-view-toolbar">
 			<input
 				v-model="linksStore.search"
 				@input="debouncedSearch"
-				type="text"
-				placeholder="Search links..."
-				class="search"
+				type=text
+				placeholder='Search links...'
+				class=links-toolbar-search
 			/>
-			<button @click="router.push('/links/new')" class="btn-primary">Create New Link</button>
+			<button @click="router.push('/links/new')" class=btn-primary>Create New Link</button>
 		</div>
 
-				<div class="links-content" :class="{ 'loading-overlay': linksStore.loading }">
+		<div class="links-content" :class="{ 'loading-overlay': linksStore.loading }">
 			<table class="links-table">
 				<thead>
 					<tr>
@@ -24,35 +24,40 @@
 					</tr>
 				</thead>
 				<tbody>
-					<tr v-for="link in linksStore.links" :key="link.id">
-						<td class="col-link link-cell">
+					<tr v-for="link in linksStore.links" :key="link.id" class="link-row">
+						<td class="col-link link-cell" data-label="Link">
 							<button
 								type="button"
-								@click.prevent="copyLink(link.domain, link.slug, link.id)" 
-								@mousemove="handleCopyHoverMove($event, `link-${link.id}`)"
-								@mouseenter="handleCopyHoverEnter($event, `link-${link.id}`)"
-								@mouseleave="handleCopyHoverLeave(`link-${link.id}`)"
+								@click.prevent="copyLink(link.domain, link.slug, link.id, $event)"
+								@mousemove="handleHoverMove($event, `link-${link.id}`)"
+								@mouseenter="handleHoverEnter($event, `link-${link.id}`)"
+								@mouseleave="handleHoverLeave(`link-${link.id}`)"
 								class="copy-link-text link-white"
 							>
 								{{ link.domain }}/{{ link.slug }}
 							</button>
 						</td>
-						<td class="col-url url-cell">
+						<td class="col-url url-cell" data-label="Target URL">
 							<button
 								type="button"
-								@click.prevent="copyUrl(link.url, link.id)" 
-								@mousemove="handleCopyHoverMove($event, `url-${link.id}`)"
-								@mouseenter="handleCopyHoverEnter($event, `url-${link.id}`)"
-								@mouseleave="handleCopyHoverLeave(`url-${link.id}`)"
+								@click.prevent="copyUrl(link.url, link.id, $event)"
+								@mousemove="handleHoverMove($event, `url-${link.id}`)"
+								@mouseenter="handleHoverEnter($event, `url-${link.id}`)"
+								@mouseleave="handleHoverLeave(`url-${link.id}`)"
 								class="copy-link url-ellipsis"
 							>
 								{{ displayUrl(link.url) }}
 							</button>
 						</td>
-						<td class="col-clicks">{{ link.click_count }}</td>
-						<td class="col-created">{{ formatDate(link.created) }}</td>
-						<td class="col-expires">{{ link.expire ? formatDate(link.expire) : '-' }}</td>
-						<td class="col-actions">
+						<td class="link-row-meta">
+							<span class="meta-clicks">{{ link.click_count }}</span>
+							<span class="meta-created">{{ formatDate(link.created) }}</span>
+							<span class="meta-expires">{{ link.expire ? formatDate(link.expire) : '-' }}</span>
+						</td>
+						<td class="col-clicks" data-label="Clicks">{{ link.click_count }}</td>
+						<td class="col-created" data-label="Created">{{ formatDate(link.created) }}</td>
+						<td class="col-expires" data-label="Expires">{{ link.expire ? formatDate(link.expire) : '-' }}</td>
+						<td class="col-actions" data-label="Actions">
 							<a @click.prevent="viewStats(link.id)" class="link-white link-small">Stats</a>
 							<a @click.prevent="editLink(link)" class="link-white link-small">Edit</a>
 							<a @click.prevent="deleteLink(link)" class="link-danger link-small">Delete</a>
@@ -77,25 +82,15 @@
 				</button>
 			</div>
 		</div>
-		<div
-			class="copy-hint"
-			:class="{ 'copy-hint-visible': copyHint.visible, 'copy-hint-copied': copyHint.isCopied }"
-			:style="{ left: `${copyHint.x}px`, top: `${copyHint.y}px` }"
-		>
-			<div class="copy-hint-icon-track">
-				<svg class="copy-hint-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<rect x="8.5" y="5" width="10" height="12" rx="1.8" fill="#2b2d33" stroke="#d2d6e0" />
-					<rect x="5.5" y="8" width="10" height="12" rx="1.8" fill="#383b45" stroke="#f2f4fa" />
-				</svg>
-				<svg class="copy-hint-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M6 12.5L10.2 16.7L18.5 8.4" fill="none" stroke="#f2f4fa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-				</svg>
-			</div>
-			<span class="copy-hint-label">
-				{{ copyHint.isCopied ? 'Copied!' : 'Click to copy:' }}
-				<span class="copy-hint-value" v-if=!copyHint.isCopied>{{ getCopyHintValue(copyHint.activeId) }}</span>
-			</span>
-		</div>
+		<PointerHint
+			:visible="hint.visible"
+			:style="hintStyle"
+			:is-copied="hint.isCopied"
+			:tap-mode="isMobileLayout"
+			show-icons
+			prefix="Click to copy:"
+			:value="getCopyHintValue(hint.activeId)"
+		/>
 
 		<Transition name="modal-fade">
 			<LinkFormModal
@@ -110,11 +105,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useLinksStore } from '../stores/links.js'
 import { useAuthStore } from '../stores/auth.js'
 import LinkFormModal from '../components/LinkFormModal.vue'
+import PointerHint from '../components/PointerHint.vue'
+import { usePointerHint } from '../composables/usePointerHint.js'
 import { formatDateYMD } from '../utils/date.js'
 
 const route = useRoute()
@@ -124,11 +121,19 @@ const authStore = useAuthStore()
 const showCreateModal = ref(false)
 const editingLink = ref(null)
 const linkFormModal = ref(null)
-const copyHint = ref({ x: 0, y: 0, visible: false, isCopied: false, activeId: null })
-let copyHintShowTimer = null
-let copyHintResetTimer = null
-let copyHintPositionLocked = false
-let copyHintMoveTimer = null
+const MOBILE_MAX_WIDTH = 640
+
+const isMobileLayout = ref(false)
+let mobileMql = null
+
+const {
+	hint,
+	hintStyle,
+	handleHoverEnter,
+	handleHoverMove,
+	handleHoverLeave,
+	showCopied
+} = usePointerHint({ isEnabled: () => !isMobileLayout.value })
 
 // Handle route changes
 watch(() => route.name, (routeName) => {
@@ -215,66 +220,13 @@ function getCopyHintValue(id) {
 	return ''
 }
 
-function setCopyHintPosition(event) {
-	copyHint.value.x = event.clientX - 2
-	copyHint.value.y = event.clientY + 3
-}
-
-function handleCopyHoverEnter(event, id) {
-	if (copyHintShowTimer) clearTimeout(copyHintShowTimer)
-	if (copyHintMoveTimer) {
-		clearTimeout(copyHintMoveTimer)
-		copyHintMoveTimer = null
-	}
-	copyHintPositionLocked = false
-	copyHint.value.activeId = id
-	setCopyHintPosition(event)
-	copyHintShowTimer = setTimeout(() => {
-		if (copyHint.value.activeId === id) {
-			copyHint.value.visible = true
-		}
-		copyHintShowTimer = null
-	}, 200)
-}
-
-function handleCopyHoverMove(event, id) {
-	if (copyHint.value.activeId !== id) return
-	if (!copyHint.value.visible && !copyHintPositionLocked) {
-		setCopyHintPosition(event)
-		return
-	}
-	if (copyHintMoveTimer) clearTimeout(copyHintMoveTimer)
-	copyHintMoveTimer = setTimeout(() => {
-		if (copyHint.value.activeId === id && copyHint.value.visible) {
-			setCopyHintPosition(event)
-		}
-		copyHintMoveTimer = null
-	}, 200)
-}
-
-function handleCopyHoverLeave(id) {
-	copyHintPositionLocked = true
-	if (copyHintShowTimer) {
-		clearTimeout(copyHintShowTimer)
-		copyHintShowTimer = null
-	}
-	if (copyHintMoveTimer) {
-		clearTimeout(copyHintMoveTimer)
-		copyHintMoveTimer = null
-	}
-	if (copyHint.value.activeId !== id) return
-	copyHint.value.activeId = null
-	copyHint.value.visible = false
-	copyHint.value.isCopied = false
-}
-
-async function copyLink(domain, slug, linkId) {
+async function copyLink(domain, slug, linkId, event) {
 	const fullLink = `https://${domain}/${slug}`
 	const hintId = `link-${linkId}`
-	
+
 	try {
 		await navigator.clipboard.writeText(fullLink)
-		showCopiedFeedback(hintId)
+		showCopiedFeedback(hintId, event)
 	} catch (err) {
 		console.error('Failed to copy link:', err)
 		const textArea = document.createElement('textarea')
@@ -285,7 +237,7 @@ async function copyLink(domain, slug, linkId) {
 		textArea.select()
 		try {
 			document.execCommand('copy')
-			showCopiedFeedback(hintId)
+			showCopiedFeedback(hintId, event)
 		} catch (fallbackErr) {
 			console.error('Fallback copy failed:', fallbackErr)
 		}
@@ -293,31 +245,18 @@ async function copyLink(domain, slug, linkId) {
 	}
 }
 
-function showCopiedFeedback(id) {
-	if (copyHintResetTimer) {
-		clearTimeout(copyHintResetTimer)
-		copyHintResetTimer = null
-	}
-	copyHint.value.activeId = id
-	copyHint.value.visible = true
-	copyHint.value.isCopied = true
-	copyHintResetTimer = setTimeout(() => {
-		copyHint.value.isCopied = false
-		if (!copyHint.value.activeId) {
-			copyHint.value.visible = false
-		}
-	}, 950)
+function showCopiedFeedback(id, event = null) {
+	showCopied(id, event, { fromTap: isMobileLayout.value && !!event })
 }
 
-async function copyUrl(url, linkId) {
+async function copyUrl(url, linkId, event) {
 	const popoverId = `url-${linkId}`
-	
+
 	try {
 		await navigator.clipboard.writeText(url)
-		showCopiedFeedback(popoverId)
+		showCopiedFeedback(popoverId, event)
 	} catch (err) {
 		console.error('Failed to copy URL:', err)
-		// Fallback for older browsers
 		const textArea = document.createElement('textarea')
 		textArea.value = url
 		textArea.style.position = 'fixed'
@@ -326,7 +265,7 @@ async function copyUrl(url, linkId) {
 		textArea.select()
 		try {
 			document.execCommand('copy')
-			showCopiedFeedback(popoverId)
+			showCopiedFeedback(popoverId, event)
 		} catch (fallbackErr) {
 			console.error('Fallback copy failed:', fallbackErr)
 		}
@@ -390,6 +329,9 @@ onBeforeRouteLeave((to, from, next) => {
 })
 
 onMounted(() => {
+	mobileMql = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`)
+	isMobileLayout.value = mobileMql.matches
+
 	// Check if we're on a search route
 	if (route.name === 'links-search' && route.params.query) {
 		const searchQuery = decodeURIComponent(route.params.query)
@@ -399,61 +341,96 @@ onMounted(() => {
 		linksStore.fetchLinks()
 	}
 })
+
+onUnmounted(() => {
+	mobileMql = null
+})
 </script>
 
 <style scoped>
-.links-view {
-	/* Uses global .view-container */
+.links-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 1rem;
+	background: var(--bg-secondary);
+	border-radius: 8px;
 }
 
-.header {
-	/* Uses global .view-header */
-}
-
-.search {
+.links-toolbar-search {
 	flex: 1;
+	min-width: 0;
 }
 
 .links-table {
-	table-layout: fixed;
+	display: block;
 	width: 100%;
-	min-width: 100%;
+	background: transparent;
+	border: none;
+	border-collapse: separate;
+	border-spacing: 0;
 }
 
 .links-content {
 	width: 100%;
+	min-width: 0;
+}
+
+.links-table thead {
+	display: block;
+	background: transparent;
+}
+
+.links-table thead tr {
+	display: grid;
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr) 5.5rem 5.5rem 5.5rem 7.5rem;
+	gap: 0.5rem;
+	padding: 0 1rem;
+	background: transparent;
+	color: var(--text-tertiary);
+	font-weight: 600;
+	margin-bottom: 0.5rem;
+}
+
+.links-table thead th {
+	background: transparent;
+	text-align: left;
+	font-weight: 600;
+}
+
+.links-table tbody {
+	display: flex;
+	flex-direction: column;
+	gap: 1em;
+	background: transparent;
+}
+
+.links-table tbody tr.link-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr) 5.5rem 5.5rem 5.5rem 7.5rem;
+	gap: 0.5rem;
+	align-items: center;
+	width: 100%;
+	padding: 1rem;
+	background: var(--bg-secondary);
+	border-radius: 8px;
+}
+
+.links-table tbody tr.link-row:hover {
+	background: color-mix(in srgb, var(--bg-tertiary) 65%, var(--bg-secondary));
 }
 
 .links-table th,
 .links-table td {
-	padding: 0.5em;
-}
-
-.col-link {
-	width: 24%;
-}
-
-.col-url {
-	width: 36%;
-}
-
-.col-clicks,
-.col-created,
-.col-expires {
-	width: 90px;
-	min-width: 90px;
-	white-space: nowrap;
+	padding: 0;
+	border: none;
+	background: transparent;
+	min-width: 0;
 }
 
 .links-table td.col-created,
 .links-table td.col-expires {
 	font-size: 0.875rem;
-}
-
-.col-actions {
-	width: 150px;
-	min-width: 150px;
-	white-space: nowrap;
 }
 
 .link-cell {
@@ -462,9 +439,12 @@ onMounted(() => {
 	min-width: 0;
 }
 
-.link-cell .copy-link-text {
-	display: block;
+.copy-link-text,
+.copy-link.url-ellipsis {
+	display: inline-block;
+	width: min(100%, max-content);
 	max-width: 100%;
+	vertical-align: top;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -511,23 +491,10 @@ onMounted(() => {
 	color: var(--link-hover);
 }
 
-
 .url-cell {
 	overflow: hidden;
 	position: relative;
 	min-width: 0;
-}
-
-.url-ellipsis {
-	display: block;
-	width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.links-table tbody tr:hover td {
-	background: color-mix(in srgb, var(--bg-tertiary) 65%, transparent);
 }
 
 .links-table td.col-actions {
@@ -536,81 +503,107 @@ onMounted(() => {
 	white-space: nowrap;
 }
 
+.col-clicks,
+.col-created,
+.col-expires {
+	white-space: nowrap;
+}
+
+.link-row-meta {
+	display: none;
+}
+
 .checkmark {
 	color: var(--accent-success);
 	font-weight: bold;
 	animation: fadeInScale 0.2s ease-in;
 }
 
-.copy-hint {
-	position: fixed;
-	height: 24px;
-	padding: 0 6px 0 8px;
-	display: flex;
-	align-items: center;
-	gap: 2px;
-	border: 1px solid var(--bg-border);
-	border-radius: 6px;
-	background: var(--bg-primary);
-	opacity: 0;
-	transform: translate(0, 0);
-	transition: opacity 0.1s ease, transform 0.1s ease;
-	pointer-events: none;
-	z-index: 60;
+@media (max-width: 640px) {
+	.links-toolbar {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.links-toolbar-search,
+	.links-toolbar .btn-primary {
+		width: 100%;
+	}
+
+	.links-table thead {
+		display: none;
+	}
+
+	.links-table tbody tr.link-row {
+		grid-template-columns: 1fr auto;
+		grid-template-areas:
+			'link actions'
+			'url url'
+			'meta meta';
+		gap: 0.35rem 0.5rem;
+		padding: 0.75rem;
+	}
+
+	.links-table td {
+		display: block;
+	}
+
+	.links-table td.col-link {
+		grid-area: link;
+	}
+
+	.links-table td.col-url {
+		grid-area: url;
+	}
+
+	.links-table td.col-clicks,
+	.links-table td.col-created,
+	.links-table td.col-expires {
+		display: none;
+	}
+
+	.links-table td.col-actions {
+		grid-area: actions;
+		align-self: start;
+		justify-content: flex-end;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.5rem;
+	}
+
+	.links-table td.link-row-meta {
+		grid-area: meta;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.75rem;
+		color: var(--text-secondary);
+	}
+
+	.link-row-meta span::before {
+		color: var(--text-tertiary);
+		font-weight: 500;
+	}
+
+	.link-row-meta .meta-clicks::before {
+		content: 'Clicks: ';
+	}
+
+	.link-row-meta .meta-created::before {
+		content: 'Created: ';
+	}
+
+	.link-row-meta .meta-expires::before {
+		content: 'Expires: ';
+	}
+
+	.pagination {
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
 }
 
-.copy-hint-visible {
-	opacity: 1;
-	transform: translate(0, 0);
-}
-
-.copy-hint-label {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	font-size: 12px;
-	white-space: nowrap;
-	color: var(--text-primary);
-}
-
-.copy-hint-value {
-	white-space: nowrap;
-	text-align: left;
-	font-family: monospace;
-	font-style: italic;
-}
-
-.copy-hint-icon-track {
-	position: relative;
-	height: 16px;
-	width: 16px;
-	overflow: hidden;
-}
-
-.copy-hint-icon {
-	position: absolute;
-	left: 0;
-	display: block;
-	height: 16px;
-	width: 16px;
-	transition: transform 0.1s ease;
-}
-
-.copy-hint-icon:first-child {
-	top: 0;
-	transform: translateY(0);
-}
-
-.copy-hint-icon:last-child {
-	top: 0;
-	transform: translateY(16px);
-}
-
-.copy-hint-copied .copy-hint-icon:first-child {
-	transform: translateY(-16px);
-}
-
-.copy-hint-copied .copy-hint-icon:last-child {
-	transform: translateY(0);
+@media (min-width: 641px) {
+	.links-toolbar {
+		margin-bottom: 1.5rem;
+	}
 }
 </style>

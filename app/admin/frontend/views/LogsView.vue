@@ -1,116 +1,118 @@
 <template>
-	<div class="logs-view">
-		<div class="header">
-			<h2>Logs</h2>
+	<div class="logs-view mobile-view-shell">
+		<div class="filters-toolbar mobile-view-toolbar">
+			<input
+				v-model="logsStore.search"
+				@input="debouncedSearch"
+				type="text"
+				placeholder="Search logs..."
+				class="filter-field filter-search"
+			/>
+			<div class="filter-dates">
+				<span class="filter-dates-label">Date range:</span>
+				<input
+					v-model="logsStore.startDate"
+					@change="logsStore.fetchLogs(1)"
+					type="date"
+					class="filter-field"
+					aria-label="Date range start"
+				/>
+				<span>-</span>
+				<input
+					v-model="logsStore.endDate"
+					@change="logsStore.fetchLogs(1)"
+					type="date"
+					class="filter-field"
+					aria-label="Date range end"
+				/>
+			</div>
+			<select
+				v-model="logsStore.eventType"
+				@change="logsStore.fetchLogs(1)"
+				class="filter-field filter-event-type"
+			>
+				<option value="all">All events</option>
+				<option value="main">Main events</option>
+				<option value="domain">Domain events</option>
+				<option value="link">Link events</option>
+			</select>
+			<select
+				v-model="logsStore.action"
+				@change="logsStore.fetchLogs(1)"
+				class="filter-field filter-action"
+			>
+				<option value="">All actions</option>
+				<option v-for="act in logsStore.actions" :key="act" :value="act">
+					{{ act.charAt(0).toUpperCase() + act.slice(1) }}
+				</option>
+			</select>
+			<select
+				v-model="logsStore.sortOrder"
+				@change="logsStore.fetchLogs(1)"
+				class="filter-field filter-sort"
+			>
+				<option value="desc">Newest first</option>
+				<option value="asc">Oldest first</option>
+			</select>
+			<button type="button" @click="logsStore.resetFilters()" class="btn-secondary filter-reset">
+				Reset filters
+			</button>
 		</div>
 
-		<div class="filters">
-			<div class="filter-row">
-				<div class="filter-group">
-					<label>Search</label>
-					<input
-						v-model="logsStore.search"
-						@input="debouncedSearch"
-						type="text"
-						placeholder="Search logs..."
-						class="search-input"
-					/>
-				</div>
+		<div class="logs-content" :class="{ 'loading-overlay': logsStore.loading }">
+			<ul v-if="logsStore.logs.length > 0" class="log-list">
+				<li
+					v-for="log in logsStore.logs"
+					:key="`${log.log_type}-${log.id}`"
+					class="log-card"
+				>
+					<div class="log-card-row log-card-row-detail log-card-row-primary">
+						<span :class="['log-card-kicker', `log-card-kicker--${log.log_type}`]">{{ log.log_type }}</span>
+						<div class="log-card-body log-card-summary">
+							<span class="log-card-item" v-if="log.item_name">{{ log.item_name }}</span>
+							<span class="log-card-action">{{ log.action }}</span>							
+							<time class="log-card-time" :datetime="logTimestampIso(log.timestamp)">
+								on 
+								{{ formatTimestamp(log.timestamp) }}
+							</time>
+						</div>
+					</div>
 
-				<div class="filter-group">
-					<label>Start Date</label>
-					<input
-						v-model="logsStore.startDate"
-						@change="logsStore.fetchLogs(1)"
-						type="date"
-					/>
-				</div>
-
-				<div class="filter-group">
-					<label>End Date</label>
-					<input
-						v-model="logsStore.endDate"
-						@change="logsStore.fetchLogs(1)"
-						type="date"
-					/>
-				</div>
-			</div>
-
-			<div class="filter-row">
-				<div class="filter-group">
-					<label>Event Type</label>
-					<select v-model="logsStore.eventType" @change="logsStore.fetchLogs(1)">
-						<option value="all">All</option>
-						<option value="main">Main</option>
-						<option value="domain">Domain</option>
-						<option value="link">Link</option>
-					</select>
-				</div>
-
-				<div class="filter-group">
-					<label>Action</label>
-					<select v-model="logsStore.action" @change="logsStore.fetchLogs(1)">
-						<option value="">All Actions</option>
-						<option v-for="act in logsStore.actions" :key="act" :value="act">
-							{{ act }}
-						</option>
-					</select>
-				</div>
-
-				<div class="filter-group">
-					<label>Sort Order</label>
-					<select v-model="logsStore.sortOrder" @change="logsStore.fetchLogs(1)">
-						<option value="desc">Newest First</option>
-						<option value="asc">Oldest First</option>
-					</select>
-				</div>
-
-					<button @click="logsStore.resetFilters()" class="btn-secondary">Reset Filters</button>
-			</div>
-		</div>
-
-				<div class="logs-content" :class="{ 'loading-overlay': logsStore.loading }">
-			<table class="logs-table">
-				<thead>
-					<tr>
-						<th>Date</th>
-						<th>Type</th>
-						<th>Action</th>
-						<th>Changes</th>
-						<th>IP Address</th>
-						<th>User Agent</th>
-						<th>Item</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr v-for="log in logsStore.logs" :key="`${log.log_type}-${log.id}`">
-						<td>{{ formatDate(log.timestamp) }}</td>
-						<td>
-							<span :class="`log-type log-type-${log.log_type}`">
-								{{ log.log_type }}
-							</span>
-						</td>
-						<td>{{ log.action }}</td>
-						<td class="diff-cell">
+					<div class="log-card-row log-card-row-detail">
+						<span class="log-card-kicker">Changes</span>
+						<div class="log-card-body">
 							<ul v-if="log.diff && log.diff.length > 0" class="diff-list">
 								<li v-for="change in log.diff" :key="change.what">
-									{{ change.what }}: 
-									<span v-if="hasDiffValue(change.before) && hasDiffValue(change.after)">{{ formatDiffValue(change.what, change.before) }} → {{ formatDiffValue(change.what, change.after) }}</span>
+									{{ change.what }}:
+									<span v-if="hasDiffValue(change.before) && hasDiffValue(change.after)" class="diff-change">
+										<span class="diff-old">{{ formatDiffValue(change.what, change.before) }}</span>
+										<span class="diff-arrow" aria-hidden="true"> → </span>
+										<span class="diff-new">{{ formatDiffValue(change.what, change.after) }}</span>
+									</span>
 									<span v-else-if="hasDiffValue(change.before)">{{ formatDiffValue(change.what, change.before) }}</span>
 									<span v-else-if="hasDiffValue(change.after)">{{ formatDiffValue(change.what, change.after) }}</span>
 								</li>
 							</ul>
-							<span v-else class="no-diff">-</span>
-						</td>
-						<td>{{ log.ip_address || '-' }}</td>
-						<td class="user-agent-cell">{{ log.browser_agent_string || '-' }}</td>
-						<td>{{ log.item_name || '-' }}</td>
-					</tr>
-					<tr v-if="logsStore.logs.length === 0">
-						<td colspan="7" class="empty">No logs found</td>
-					</tr>
-				</tbody>
-			</table>
+							<span v-else class="no-diff">—</span>
+						</div>
+					</div>
+
+					<div class="log-card-row log-card-row-detail">
+						<span class="log-card-kicker">Network</span>
+						<div class="log-card-body">
+							<div class="log-card-net-line">
+								<span class="log-card-net-label">IP</span>
+								<span class="log-card-net-value">{{ log.ip_address || '—' }}</span>
+							</div>
+							<div class="log-card-net-line">
+								<span class="log-card-net-label">UA</span>
+								<span class="log-card-net-value log-card-net-value--ua">{{ log.browser_agent_string || '—' }}</span>
+							</div>
+						</div>
+					</div>
+				</li>
+			</ul>
+			<p v-else class="empty">No logs found</p>
 
 			<div class="pagination">
 				<button
@@ -151,8 +153,18 @@ function changePage(page) {
 	logsStore.fetchLogs(page)
 }
 
-function formatDate(timestamp) {
-	return formatDateYMD(timestamp)
+function formatTimestamp(timestamp) {
+	if (!timestamp) return '—'
+	const date = new Date(timestamp)
+	if (Number.isNaN(date.getTime())) return '—'
+	return date.toISOString().replace('T', ' ').slice(0, 16)
+}
+
+function logTimestampIso(timestamp) {
+	if (!timestamp) return undefined
+	const date = new Date(timestamp)
+	if (Number.isNaN(date.getTime())) return undefined
+	return date.toISOString()
 }
 
 function hasDiffValue(value) {
@@ -179,86 +191,178 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.logs-view {
-	/* Uses global .view-container */
-}
-
-.header {
-	margin-bottom: 1.5rem;
-}
-
-.header h2 {
-	margin: 0;
-	color: var(--text-tertiary);
-}
-
-.filters {
-	background: var(--bg-tertiary);
+.filters-toolbar {
+	background: var(--bg-secondary);
 	padding: 1rem;
-	border-radius: 4px;
-	margin-bottom: 1.5rem;
+	border-radius: 8px;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.75rem;
+	align-items: center;
 }
 
-.filter-row {
+.filter-field,
+.filter-reset {
+	min-width: 0;
+	width: 100%;
+}
+
+.filter-search {
+	grid-column: 1 / -1;
+}
+
+.filter-dates {
+	grid-column: 1 / -1;
 	display: flex;
-	gap: 1rem;
-	margin-bottom: 1rem;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
 }
 
-.filter-row:last-child {
-	margin-bottom: 0;
-}
-
-.filter-group {
-	flex: 1;
-	min-width: 150px;
-}
-
-.filter-group label {
-	display: block;
-	margin-bottom: 0.5rem;
+.filter-dates-label {
+	flex-shrink: 0;
 	font-size: 0.875rem;
-	color: var(--text-primary);
-}
-
-.filter-group input,
-.filter-group select {
-	width: 100%;
-}
-
-.search-input {
-	flex: 2;
-}
-
-/* Button styles use global classes */
-
-.logs-table {
-	width: 100%;
-	border-collapse: collapse;
-}
-
-.logs-table th,
-.logs-table td {
-	padding: 0.75rem;
-	text-align: left;
-	border-bottom: 1px solid var(--bg-border);
-}
-
-.logs-table th {
-	background: var(--bg-tertiary);
-	font-weight: 600;
-	color: var(--text-tertiary);
-}
-
-.user-agent-cell {
-	max-width: 300px;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	color: var(--text-secondary);
 	white-space: nowrap;
 }
 
-.diff-cell {
-	max-width: 300px;
+.filter-dates .filter-field {
+	flex: 1;
+	min-width: 0;
+	width: auto;
+}
+
+@media (min-width: 641px) {
+	.filters-toolbar {
+		margin-bottom: 1.5rem;
+		grid-template-columns: auto repeat(4, minmax(0, 1fr));
+		gap: 1rem;
+	}
+
+	.filter-search {
+		grid-column: 1 / -1;
+		grid-row: 1;
+	}
+
+	.filter-dates {
+		grid-column: 1;
+		grid-row: 2;
+		gap: 0.35rem;
+	}
+
+	.filter-dates .filter-field {
+		flex: 0 0 auto;
+		width: 7.25rem;
+		max-width: 7.25rem;
+	}
+
+	.filter-event-type {
+		grid-column: 2;
+		grid-row: 2;
+	}
+
+	.filter-action {
+		grid-column: 3;
+		grid-row: 2;
+	}
+
+	.filter-sort {
+		grid-column: 4;
+		grid-row: 2;
+	}
+
+	.filter-reset {
+		grid-column: 5;
+		grid-row: 2;
+	}
+}
+
+.log-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1em;
+}
+
+.log-card {
+	padding: 0.75rem;
+	background: var(--bg-secondary);
+	border-radius: 8px;
+}
+
+.log-card-row {
+	min-width: 0;
+}
+
+.log-card-row + .log-card-row {
+	margin-top: 0.45rem;
+}
+
+.log-card-summary {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 0.15rem 0.35rem;
+	min-width: 0;
+}
+
+.log-card-time {
+	flex-shrink: 0;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-secondary);
+	white-space: nowrap;
+}
+
+.log-card-item {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.log-card-action {
+	flex-shrink: 0;
+	font-weight: 500;
+	white-space: nowrap;
+	color: var(--text-secondary);
+	font-style: italic;
+}
+
+.log-card-row-detail {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+}
+
+.log-card-kicker {
+	flex: 0 0 4.25rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-tertiary);
+	line-height: 1.35;
+	padding-top: 0.1rem;
+}
+
+.log-card-kicker--main {
+	color: color-mix(in srgb, var(--link-base) 62%, var(--text-tertiary));
+}
+
+.log-card-kicker--domain {
+	color: color-mix(in srgb, var(--accent-info) 62%, var(--text-tertiary));
+}
+
+.log-card-kicker--link {
+	color: color-mix(in srgb, var(--accent-warning) 62%, var(--text-tertiary));
+}
+
+.log-card-body {
+	flex: 1;
+	min-width: 0;
+	color: var(--text-primary);
+	line-height: 1.35;
 }
 
 .diff-list {
@@ -267,42 +371,79 @@ onMounted(() => {
 	margin: 0;
 }
 
-.diff-list li {
-	padding: 0.25rem 0;
-	font-size: 0.875rem;
-	color: var(--text-primary);
+.diff-list li + li {
+	margin-top: 0.2rem;
 }
 
-.diff-list li em {
-	color: var(--text-secondary);
-	font-style: italic;
+.diff-list li {
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.diff-old {
+	color: color-mix(in srgb, var(--accent-error) 40%, var(--text-primary));
+}
+
+.diff-new {
+	color: color-mix(in srgb, var(--accent-success) 30%, var(--text-primary));
+}
+
+.diff-arrow {
+	color: var(--text-primary);
 }
 
 .no-diff {
 	color: var(--text-secondary);
 }
 
-.log-type {
-	padding: 0.25rem 0.5rem;
-	border-radius: 4px;
-	font-size: 0.875rem;
-	font-weight: 500;
-	text-transform: capitalize;
+.log-card-net-line {
+	display: flex;
+	gap: 0.35rem;
+	align-items: flex-start;
 }
 
-.log-type-main {
-	background: var(--link-base);
-	color: var(--text-white);
+.log-card-net-line + .log-card-net-line {
+	margin-top: 0.2rem;
 }
 
-.log-type-domain {
-	background: var(--accent-info);
-	color: var(--bg-primary);
+.log-card-net-label {
+	flex-shrink: 0;
+	color: var(--text-tertiary);
+	font-variant-numeric: tabular-nums;
 }
 
-.log-type-link {
-	background: var(--accent-warning);
-	color: var(--text-white);
+.log-card-net-value {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	color: var(--text-tertiary);
+}
+
+.log-card-net-value--ua {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow-wrap: normal;
+	word-break: normal;
+}
+
+@media (min-width: 641px) {
+	.log-card {
+		padding: 0.65rem 0.75rem;
+	}
+
+	.log-card-summary {
+		flex-wrap: nowrap;
+		overflow: hidden;
+	}
+
+	.log-card-item {
+		flex: 0 1 auto;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 }
 
 /* Empty, pagination, loading overlay use global classes */

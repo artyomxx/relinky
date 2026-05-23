@@ -3,7 +3,8 @@ import { useAuthStore } from './stores/auth.js'
 import DashboardView from './views/DashboardView.vue'
 import LinksView from './views/LinksView.vue'
 import StatsView from './views/StatsView.vue'
-import SettingsView from './views/SettingsView.vue'
+import DomainsView from './views/domains/DomainsView.vue'
+import ToolsView from './views/tools/ToolsView.vue'
 import LogsView from './views/LogsView.vue'
 import AuthView from './views/AuthView.vue'
 
@@ -52,29 +53,38 @@ const routes = [
 				component: StatsView
 			},
 			{
+				path: 'domains',
+				name: 'domains',
+				component: DomainsView
+			},
+			{
+				path: 'tools',
+				name: 'tools',
+				component: ToolsView
+			},
+			{
 				path: 'settings',
-				name: 'settings',
-				component: SettingsView
+				redirect: '/domains'
 			},
 			{
 				path: 'settings/domains',
-				name: 'settings-domains',
-				component: SettingsView
-			},
-			{
-				path: 'settings/import-export',
-				name: 'settings-import-export',
-				component: SettingsView
-			},
-			{
-				path: 'settings/api-keys',
-				name: 'settings-api-keys',
-				component: SettingsView
+				redirect: '/domains'
 			},
 			{
 				path: 'settings/danger-zone',
-				name: 'settings-danger-zone',
-				component: SettingsView
+				redirect: '/domains'
+			},
+			{
+				path: 'settings/import-export',
+				redirect: '/tools'
+			},
+			{
+				path: 'settings/api-keys',
+				redirect: '/tools'
+			},
+			{
+				path: 'settings/:pathMatch(.*)*',
+				redirect: '/domains'
 			},
 			{
 				path: 'logs',
@@ -113,4 +123,3 @@ router.beforeEach(async (to, from, next) => {
 })
 
 export default router
-

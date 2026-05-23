@@ -1,29 +1,21 @@
 <template>
-	<div class="tab-content settings-tab">
-		<div class="settings-tab-header settings-tab-header-with-action">
-			<h3 class="settings-tab-title">Domains</h3>
-			<button type="button" class="btn-primary btn-small" @click="openAddDomain">Add Domain</button>
-		</div>
-
-		<div class="domains-content settings-card" :class="{ 'loading-overlay': loading }">
-			<ul class="domains-list">
-				<li v-for="domain in domains" :key="domain.id" class="domain-item">
-					<span class="domain-name">{{ domain.domain }}</span>
-					<span class="domain-links">
-						<router-link
-							v-if="domain.link_count > 0"
-							:to="`/links/search/${encodeURIComponent(domain.domain)}`"
-							class="link-count"
-						>
-							{{ domain.link_count }} links
-						</router-link>
-						<span v-else class="link-count-zero">0 links</span>
-					</span>
-					<a @click.prevent="deleteDomain(domain.id)" class="link-danger link-small">Delete</a>
-				</li>
-				<li v-if="domains.length === 0" class="empty">No domains yet</li>
-			</ul>
-		</div>
+	<div class="domains-content" :class="{ 'loading-overlay': loading }">
+		<ul v-if="domains.length > 0" class="domain-list">
+			<li v-for="domain in domains" :key="domain.id" class="domain-row">
+				<span class="domain-name">{{ domain.domain }}</span>
+				<span class="domain-links">
+					<router-link
+						v-if="domain.link_count > 0"
+						:to="`/links/search/${encodeURIComponent(domain.domain)}`"
+						class="link-count"
+					>
+						{{ domain.link_count }} links
+					</router-link>
+					<span v-else class="link-count-zero">0 links</span>
+				</span>
+			</li>
+		</ul>
+		<p v-else class="empty">No domains yet</p>
 
 		<Transition name="modal-fade">
 			<div v-if="showAddDomain" class="modal-overlay" @click.self="handleCloseDomainModal">
@@ -58,9 +50,7 @@ const props = defineProps({
 	domainInputRefSetter: { type: Function, required: true },
 	domainCancelButtonRefSetter: { type: Function, required: true },
 	handleCloseDomainModal: { type: Function, required: true },
-	handleAddDomain: { type: Function, required: true },
-	deleteDomain: { type: Function, required: true },
-	openAddDomain: { type: Function, required: true }
+	handleAddDomain: { type: Function, required: true }
 })
 
 const emit = defineEmits(['update:newDomain'])
@@ -72,35 +62,47 @@ const newDomainModel = computed({
 </script>
 
 <style scoped>
-.domains-list {
-	list-style: none;
-	padding: 0;
-	margin: 0;
+.domains-content {
+	width: 100%;
+	min-width: 0;
 }
 
-.domain-item {
+.domain-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1em;
+}
+
+.domain-row {
 	display: flex;
 	align-items: center;
 	gap: 1rem;
-	padding: 0.75rem;
-	border-bottom: 1px solid var(--bg-border);
+	padding: 1rem;
+	background: var(--bg-secondary);
+	border-radius: 8px;
 }
 
-.domain-item:last-child {
-	border-bottom: none;
+.domain-row:hover {
+	background: color-mix(in srgb, var(--bg-tertiary) 65%, var(--bg-secondary));
 }
 
 .domain-name {
 	flex: 1;
 	font-weight: 500;
+	min-width: 0;
 }
 
 .domain-links {
+	flex-shrink: 0;
 	color: var(--text-secondary);
 }
 
-.domains-list .empty {
-	list-style: none;
+.empty {
+	margin: 0;
+	color: var(--text-secondary);
 }
 
 .link-count {

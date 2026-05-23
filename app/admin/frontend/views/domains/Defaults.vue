@@ -1,12 +1,7 @@
 <template>
-	<div class="tab-content settings-tab" :class="{ 'loading-overlay': loading }">
-		<div class="settings-tab-header">
-			<h3 class="settings-tab-title">General</h3>
-		</div>
-
+	<div class="general-settings" :class="{ 'loading-overlay': loading }">
 		<div class="settings-columns">
 			<div class="settings-column settings-card">
-				<h3>Defaults</h3>
 				<form @submit.prevent class="settings-form">
 					<div class="form-group">
 						<label>Default Domain</label>
@@ -52,7 +47,6 @@
 			</div>
 
 			<div class="settings-column settings-card">
-				<h3>Error Links</h3>
 				<form @submit.prevent class="settings-form">
 					<div class="form-group">
 						<label>404 Redirect URL</label>

@@ -8,7 +8,8 @@
 				`field-hint--${variant}`,
 				{
 					'field-hint--has-list': items.length > 0,
-					'field-hint--clickable': !!seeMoreHref
+					'field-hint--clickable': !!seeMoreHref || showDismiss,
+					'field-hint--mobile': isMobile
 				}
 			]"
 			:role="variant === 'error' ? 'alert' : 'status'"
@@ -21,22 +22,34 @@
 					{{ formatItem(item) }}
 				</li>
 			</ul>
-			<a
-				v-if="seeMoreHref"
-				:href="seeMoreHref"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="field-hint__see-more"
-			>
-				{{ seeMoreLabel }}
-			</a>
+			<div v-if="seeMoreHref || showDismiss" class="field-hint__actions">
+				<a
+					v-if="seeMoreHref"
+					:href="seeMoreHref"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="field-hint__see-more"
+				>
+					{{ seeMoreLabel }}
+				</a>
+				<a
+					v-if="showDismiss"
+					href="#"
+					class="field-hint__dismiss"
+					@click.prevent="onDismiss"
+				>
+					{{ dismissLabel }}
+				</a>
+			</div>
 		</div>
 	</Teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
-import { computePosition, flip, shift, offset, arrow, autoUpdate } from '@floating-ui/dom'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { computePosition, flip, shift, offset, arrow, size, autoUpdate } from '@floating-ui/dom'
+
+const MOBILE_MAX_WIDTH = 640
 
 const props = defineProps({
 	open: {
@@ -71,12 +84,43 @@ const props = defineProps({
 	seeMoreLabel: {
 		type: String,
 		default: 'See more'
+	},
+	showDismiss: {
+		type: Boolean,
+		default: false
+	},
+	dismissLabel: {
+		type: String,
+		default: 'Dismiss'
 	}
 })
+
+const emit = defineEmits(['dismiss'])
+
+function onDismiss() {
+	emit('dismiss')
+}
 
 const floatingEl = ref(null)
 const arrowEl = ref(null)
 const coords = ref({ x: 0, y: 0 })
+const isMobile = ref(false)
+
+let mobileMql = null
+
+function onMobileLayoutChange(event) {
+	isMobile.value = event.matches
+	if (props.open && props.anchor) {
+		updatePosition()
+	}
+}
+
+function resolvedPlacement() {
+	if (isMobile.value && (props.placement === 'right' || props.placement === 'left')) {
+		return 'top'
+	}
+	return props.placement
+}
 
 const floatingStyle = computed(() => ({
 	position: 'fixed',
@@ -125,19 +169,48 @@ function setArrowPosition(side, arrowData) {
 	})
 }
 
+function buildMiddleware() {
+	const middleware = [
+		offset(isMobile.value ? 8 : 10),
+		flip({ fallbackPlacements: ['top', 'bottom', 'right', 'left'] }),
+		shift({ padding: 8 })
+	]
+
+	if (isMobile.value) {
+		middleware.push(
+			size({
+				apply({ rects, elements }) {
+					const width = Math.min(rects.reference.width, window.innerWidth - 16)
+					Object.assign(elements.floating.style, {
+						width: `${width}px`,
+						maxWidth: `${width}px`
+					})
+				}
+			})
+		)
+	} else {
+		middleware.push(
+			size({
+				apply({ elements }) {
+					elements.floating.style.width = ''
+					elements.floating.style.maxWidth = ''
+				}
+			})
+		)
+	}
+
+	middleware.push(arrow({ element: arrowEl.value, padding: 4 }))
+	return middleware
+}
+
 async function updatePosition() {
 	const reference = props.anchor
 	const floating = floatingEl.value
 	if (!reference || !floating) return
 
 	const result = await computePosition(reference, floating, {
-		placement: props.placement,
-		middleware: [
-			offset(10),
-			flip(),
-			shift({ padding: 8 }),
-			arrow({ element: arrowEl.value, padding: 4 })
-		]
+		placement: resolvedPlacement(),
+		middleware: buildMiddleware()
 	})
 
 	coords.value = { x: result.x, y: result.y }
@@ -165,7 +238,8 @@ watch(
 			props.items,
 			props.placement,
 			props.variant,
-			props.seeMoreHref
+			props.seeMoreHref,
+			props.showDismiss
 		],
 	async () => {
 		teardownAutoUpdate()
@@ -177,7 +251,17 @@ watch(
 	{ flush: 'post', deep: true }
 )
 
-onBeforeUnmount(teardownAutoUpdate)
+onMounted(() => {
+	mobileMql = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`)
+	isMobile.value = mobileMql.matches
+	mobileMql.addEventListener('change', onMobileLayoutChange)
+})
+
+onBeforeUnmount(() => {
+	mobileMql?.removeEventListener('change', onMobileLayoutChange)
+	mobileMql = null
+	teardownAutoUpdate()
+})
 </script>
 
 <style scoped>
@@ -194,6 +278,10 @@ onBeforeUnmount(teardownAutoUpdate)
 .field-hint--has-list {
 	padding: 0.45rem 0.6rem;
 	max-width: min(320px, calc(100vw - 16px));
+}
+
+.field-hint--mobile.field-hint--has-list {
+	max-width: calc(100vw - 16px);
 }
 
 .field-hint__message {
@@ -214,9 +302,17 @@ onBeforeUnmount(teardownAutoUpdate)
 	margin: 0.15rem 0;
 }
 
-.field-hint__see-more {
-	display: inline-block;
+.field-hint__actions {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
 	margin-top: 0.4rem;
+}
+
+.field-hint__see-more {
+	flex: 1 1 auto;
+	min-width: 0;
 	font-size: 0.8125rem;
 	color: var(--link-base);
 	text-decoration: underline;
@@ -224,6 +320,19 @@ onBeforeUnmount(teardownAutoUpdate)
 
 .field-hint__see-more:hover {
 	color: var(--link-hover);
+}
+
+.field-hint__dismiss {
+	flex-shrink: 0;
+	margin-left: auto;
+	font-size: 0.8125rem;
+	color: var(--text-secondary);
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.field-hint__dismiss:hover {
+	color: var(--text-primary);
 }
 
 .field-hint--clickable {
