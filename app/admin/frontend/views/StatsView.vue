@@ -264,8 +264,14 @@ onMounted(() => {
 <style scoped>
 @media (max-width: 640px) {
 	.stats-view.view-container {
-		padding: 0.75rem 1rem;
+		padding: 0 1rem 0.75rem;
 		border-radius: 0;
+		background: transparent;
+	}
+
+	.stats-header {
+		margin-top: 1rem;
+		margin-bottom: 1rem;
 	}
 
 	.stats-header .stats-period-row {
@@ -538,6 +544,8 @@ onMounted(() => {
 	.stats-tops.stats-tops--single-link {
 		grid-template-columns: 1fr;
 		gap: 1rem;
+		margin-top: 0;
+		margin-bottom: 1rem;
 	}
 
 	.stats-tops-mini,
@@ -550,6 +558,12 @@ onMounted(() => {
 	.top-section ul.scrollable-list {
 		height: auto;
 		max-height: 12rem;
+	}
+
+	.summary-small,
+	.top-section,
+	.link-stats-main {
+		background: var(--bg-secondary);
 	}
 }
 </style>

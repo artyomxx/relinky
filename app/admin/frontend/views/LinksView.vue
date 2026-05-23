@@ -1,17 +1,17 @@
 <template>
-	<div class="links-view view-container">
-		<div class="header view-header">
+	<div class=links-view>
+		<div class=links-toolbar>
 			<input
 				v-model="linksStore.search"
 				@input="debouncedSearch"
-				type="text"
-				placeholder="Search links..."
-				class="search"
+				type=text
+				placeholder='Search links...'
+				class=links-toolbar-search
 			/>
-			<button @click="router.push('/links/new')" class="btn-primary">Create New Link</button>
+			<button @click="router.push('/links/new')" class=btn-primary>Create New Link</button>
 		</div>
 
-				<div class="links-content" :class="{ 'loading-overlay': linksStore.loading }">
+		<div class="links-content" :class="{ 'loading-overlay': linksStore.loading }">
 			<table class="links-table">
 				<thead>
 					<tr>
@@ -348,58 +348,90 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.links-view {
-	/* Uses global .view-container */
+.links-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 1rem;
+	margin-bottom: 1.5rem;
+	background: var(--bg-secondary);
+	border-radius: 8px;
 }
 
-.header {
-	/* Uses global .view-header */
-}
-
-.search {
+.links-toolbar-search {
 	flex: 1;
+	min-width: 0;
 }
 
 .links-table {
-	table-layout: fixed;
+	display: block;
 	width: 100%;
-	min-width: 100%;
+	background: transparent;
+	border: none;
+	border-collapse: separate;
+	border-spacing: 0;
 }
 
 .links-content {
 	width: 100%;
+	min-width: 0;
+}
+
+.links-table thead {
+	display: block;
+	background: transparent;
+}
+
+.links-table thead tr {
+	display: grid;
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr) 5.5rem 5.5rem 5.5rem 7.5rem;
+	gap: 0.5rem;
+	padding: 0 1rem;
+	background: transparent;
+	color: var(--text-tertiary);
+	font-weight: 600;
+	margin-bottom: 0.5rem;
+}
+
+.links-table thead th {
+	background: transparent;
+	text-align: left;
+	font-weight: 600;
+}
+
+.links-table tbody {
+	display: flex;
+	flex-direction: column;
+	gap: 1em;
+	background: transparent;
+}
+
+.links-table tbody tr.link-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr) 5.5rem 5.5rem 5.5rem 7.5rem;
+	gap: 0.5rem;
+	align-items: center;
+	width: 100%;
+	padding: 1rem;
+	background: var(--bg-secondary);
+	border-radius: 8px;
+}
+
+.links-table tbody tr.link-row:hover {
+	background: color-mix(in srgb, var(--bg-tertiary) 65%, var(--bg-secondary));
 }
 
 .links-table th,
 .links-table td {
-	padding: 0.5em;
-}
-
-.col-link {
-	width: 24%;
-}
-
-.col-url {
-	width: 36%;
-}
-
-.col-clicks,
-.col-created,
-.col-expires {
-	width: 90px;
-	min-width: 90px;
-	white-space: nowrap;
+	padding: 0;
+	border: none;
+	background: transparent;
+	min-width: 0;
 }
 
 .links-table td.col-created,
 .links-table td.col-expires {
 	font-size: 0.875rem;
-}
-
-.col-actions {
-	width: 150px;
-	min-width: 150px;
-	white-space: nowrap;
 }
 
 .link-cell {
@@ -466,13 +498,15 @@ onUnmounted(() => {
 	min-width: 0;
 }
 
-.links-table tbody tr:hover td {
-	background: color-mix(in srgb, var(--bg-tertiary) 65%, transparent);
-}
-
 .links-table td.col-actions {
 	display: flex;
 	gap: 0.5rem;
+	white-space: nowrap;
+}
+
+.col-clicks,
+.col-created,
+.col-expires {
 	white-space: nowrap;
 }
 
@@ -488,34 +522,19 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
 	.links-view {
-		padding: 0.75rem;
-		border-radius: 0;
+		padding: 0 1rem 0.75rem;
 	}
 
-	.header {
+	.links-toolbar {
 		flex-direction: column;
 		align-items: stretch;
+		margin-top: 1rem;
 		margin-bottom: 1rem;
-		gap: 0.75rem;
 	}
 
-	.search {
+	.links-toolbar-search,
+	.links-toolbar .btn-primary {
 		width: 100%;
-		min-width: 0;
-	}
-
-	.header .btn-primary {
-		width: 100%;
-	}
-
-	.links-table,
-	.links-table tbody {
-		display: block;
-		width: 100%;
-	}
-
-	.links-table {
-		table-layout: auto;
 	}
 
 	.links-table thead {
@@ -523,7 +542,6 @@ onUnmounted(() => {
 	}
 
 	.links-table tbody tr.link-row {
-		display: grid;
 		grid-template-columns: 1fr auto;
 		grid-template-areas:
 			'link actions'
@@ -531,32 +549,18 @@ onUnmounted(() => {
 			'meta meta';
 		gap: 0.35rem 0.5rem;
 		padding: 0.75rem;
-		border-bottom: 1px solid var(--bg-border);
-	}
-
-	.links-table tbody tr.link-row:hover td {
-		background: transparent;
-	}
-
-	.links-table tbody tr.link-row:hover {
-		background: color-mix(in srgb, var(--bg-tertiary) 65%, transparent);
 	}
 
 	.links-table td {
 		display: block;
-		padding: 0;
-		border-bottom: none;
-		min-width: 0;
 	}
 
 	.links-table td.col-link {
 		grid-area: link;
-		width: auto;
 	}
 
 	.links-table td.col-url {
 		grid-area: url;
-		width: auto;
 	}
 
 	.links-table td.col-clicks,
@@ -567,20 +571,10 @@ onUnmounted(() => {
 
 	.links-table td.col-actions {
 		grid-area: actions;
-		width: auto;
-		min-width: 0;
 		align-self: start;
 		justify-content: flex-end;
 		flex-wrap: wrap;
 		gap: 0.35rem 0.5rem;
-	}
-
-	.links-table td.col-actions::before {
-		display: none;
-	}
-
-	.link-row-meta {
-		display: none;
 	}
 
 	.links-table td.link-row-meta {
@@ -588,7 +582,6 @@ onUnmounted(() => {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.35rem 0.75rem;
-		font-size: 0.8125rem;
 		color: var(--text-secondary);
 	}
 
@@ -612,8 +605,6 @@ onUnmounted(() => {
 	.pagination {
 		flex-wrap: wrap;
 		gap: 0.5rem;
-		font-size: 0.875rem;
 	}
-
 }
 </style>

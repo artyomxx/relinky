@@ -205,9 +205,9 @@ onMounted(() => {
 }
 
 .filters-toolbar {
-	background: var(--bg-tertiary);
+	background: var(--bg-secondary);
 	padding: 1rem;
-	border-radius: 4px;
+	border-radius: 8px;
 	margin-bottom: 1.5rem;
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -244,6 +244,17 @@ onMounted(() => {
 	flex: 1;
 	min-width: 0;
 	width: auto;
+}
+
+@media (max-width: 640px) {
+	.logs-view {
+		padding: 0 1rem 0.75rem;
+	}
+
+	.filters-toolbar {
+		margin-top: 1rem;
+		margin-bottom: 1rem;
+	}
 }
 
 @media (min-width: 641px) {
@@ -296,12 +307,13 @@ onMounted(() => {
 	padding: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 0.5em;
+	gap: 1em;
 }
 
 .log-card {
 	padding: 0.75rem;
 	background: var(--bg-secondary);
+	border-radius: 8px;
 }
 
 .log-card-row {
@@ -322,7 +334,6 @@ onMounted(() => {
 
 .log-card-time {
 	flex-shrink: 0;
-	font-size: 0.8125rem;
 	font-variant-numeric: tabular-nums;
 	color: var(--text-secondary);
 	white-space: nowrap;
@@ -351,7 +362,6 @@ onMounted(() => {
 	display: flex;
 	align-items: flex-start;
 	gap: 0.5rem;
-	font-size: 0.8125rem;
 }
 
 .log-card-kicker {
