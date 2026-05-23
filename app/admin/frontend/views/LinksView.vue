@@ -24,11 +24,11 @@
 					</tr>
 				</thead>
 				<tbody>
-					<tr v-for="link in linksStore.links" :key="link.id">
-						<td class="col-link link-cell">
+					<tr v-for="link in linksStore.links" :key="link.id" class="link-row">
+						<td class="col-link link-cell" data-label="Link">
 							<button
 								type="button"
-								@click.prevent="copyLink(link.domain, link.slug, link.id)" 
+								@click.prevent="copyLink(link.domain, link.slug, link.id, $event)"
 								@mousemove="handleCopyHoverMove($event, `link-${link.id}`)"
 								@mouseenter="handleCopyHoverEnter($event, `link-${link.id}`)"
 								@mouseleave="handleCopyHoverLeave(`link-${link.id}`)"
@@ -37,10 +37,10 @@
 								{{ link.domain }}/{{ link.slug }}
 							</button>
 						</td>
-						<td class="col-url url-cell">
+						<td class="col-url url-cell" data-label="Target URL">
 							<button
 								type="button"
-								@click.prevent="copyUrl(link.url, link.id)" 
+								@click.prevent="copyUrl(link.url, link.id, $event)"
 								@mousemove="handleCopyHoverMove($event, `url-${link.id}`)"
 								@mouseenter="handleCopyHoverEnter($event, `url-${link.id}`)"
 								@mouseleave="handleCopyHoverLeave(`url-${link.id}`)"
@@ -49,10 +49,15 @@
 								{{ displayUrl(link.url) }}
 							</button>
 						</td>
-						<td class="col-clicks">{{ link.click_count }}</td>
-						<td class="col-created">{{ formatDate(link.created) }}</td>
-						<td class="col-expires">{{ link.expire ? formatDate(link.expire) : '-' }}</td>
-						<td class="col-actions">
+						<td class="link-row-meta">
+							<span class="meta-clicks">{{ link.click_count }}</span>
+							<span class="meta-created">{{ formatDate(link.created) }}</span>
+							<span class="meta-expires">{{ link.expire ? formatDate(link.expire) : '-' }}</span>
+						</td>
+						<td class="col-clicks" data-label="Clicks">{{ link.click_count }}</td>
+						<td class="col-created" data-label="Created">{{ formatDate(link.created) }}</td>
+						<td class="col-expires" data-label="Expires">{{ link.expire ? formatDate(link.expire) : '-' }}</td>
+						<td class="col-actions" data-label="Actions">
 							<a @click.prevent="viewStats(link.id)" class="link-white link-small">Stats</a>
 							<a @click.prevent="editLink(link)" class="link-white link-small">Edit</a>
 							<a @click.prevent="deleteLink(link)" class="link-danger link-small">Delete</a>
@@ -79,8 +84,12 @@
 		</div>
 		<div
 			class="copy-hint"
-			:class="{ 'copy-hint-visible': copyHint.visible, 'copy-hint-copied': copyHint.isCopied }"
-			:style="{ left: `${copyHint.x}px`, top: `${copyHint.y}px` }"
+			:class="{
+				'copy-hint-visible': copyHint.visible,
+				'copy-hint-copied': copyHint.isCopied,
+				'copy-hint--tap': isMobileLayout
+			}"
+			:style="copyHintStyle"
 		>
 			<div class="copy-hint-icon-track">
 				<svg class="copy-hint-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -93,7 +102,7 @@
 			</div>
 			<span class="copy-hint-label">
 				{{ copyHint.isCopied ? 'Copied!' : 'Click to copy:' }}
-				<span class="copy-hint-value" v-if=!copyHint.isCopied>{{ getCopyHintValue(copyHint.activeId) }}</span>
+				<span class="copy-hint-value" v-if="!copyHint.isCopied">{{ getCopyHintValue(copyHint.activeId) }}</span>
 			</span>
 		</div>
 
@@ -110,7 +119,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useLinksStore } from '../stores/links.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -124,11 +133,26 @@ const authStore = useAuthStore()
 const showCreateModal = ref(false)
 const editingLink = ref(null)
 const linkFormModal = ref(null)
-const copyHint = ref({ x: 0, y: 0, visible: false, isCopied: false, activeId: null })
+const MOBILE_MAX_WIDTH = 640
+
+const copyHint = ref({ x: 0, y: 0, visible: false, isCopied: false, activeId: null, maxWidth: null })
+
+const copyHintStyle = computed(() => {
+	const style = {
+		left: `${copyHint.value.x}px`,
+		top: `${copyHint.value.y}px`
+	}
+	if (copyHint.value.maxWidth != null) {
+		style.maxWidth = `${copyHint.value.maxWidth}px`
+	}
+	return style
+})
+const isMobileLayout = ref(false)
 let copyHintShowTimer = null
 let copyHintResetTimer = null
 let copyHintPositionLocked = false
 let copyHintMoveTimer = null
+let mobileMql = null
 
 // Handle route changes
 watch(() => route.name, (routeName) => {
@@ -215,12 +239,46 @@ function getCopyHintValue(id) {
 	return ''
 }
 
+const COPY_HINT_MARGIN = 8
+const COPY_HINT_MIN_WIDTH = 120
+
+function layoutCopyHintAtPointer(event, { constrainWidth = true } = {}) {
+	const point = event.changedTouches?.[0] ?? event.touches?.[0] ?? event
+	let x = point.clientX - 2
+	const y = point.clientY + 3
+
+	if (constrainWidth) {
+		let maxWidth = window.innerWidth - COPY_HINT_MARGIN - x
+		if (maxWidth < COPY_HINT_MIN_WIDTH) {
+			x = Math.max(COPY_HINT_MARGIN, window.innerWidth - COPY_HINT_MARGIN - COPY_HINT_MIN_WIDTH)
+			maxWidth = window.innerWidth - COPY_HINT_MARGIN - x
+		}
+		copyHint.value.maxWidth = maxWidth
+	} else {
+		copyHint.value.maxWidth = null
+	}
+
+	copyHint.value.x = x
+	copyHint.value.y = y
+}
+
 function setCopyHintPosition(event) {
-	copyHint.value.x = event.clientX - 2
-	copyHint.value.y = event.clientY + 3
+	layoutCopyHintAtPointer(event, { constrainWidth: true })
+}
+
+function setCopyHintPositionFromTap(event) {
+	const point = event.changedTouches?.[0] ?? event.touches?.[0] ?? event
+	const x = point.clientX
+	const y = point.clientY
+	const hintW = 108
+	const hintH = 28
+	copyHint.value.maxWidth = null
+	copyHint.value.x = Math.min(Math.max(COPY_HINT_MARGIN, x - 2), window.innerWidth - hintW - COPY_HINT_MARGIN)
+	copyHint.value.y = Math.min(Math.max(COPY_HINT_MARGIN, y + 3), window.innerHeight - hintH - COPY_HINT_MARGIN)
 }
 
 function handleCopyHoverEnter(event, id) {
+	if (isMobileLayout.value) return
 	if (copyHintShowTimer) clearTimeout(copyHintShowTimer)
 	if (copyHintMoveTimer) {
 		clearTimeout(copyHintMoveTimer)
@@ -238,6 +296,7 @@ function handleCopyHoverEnter(event, id) {
 }
 
 function handleCopyHoverMove(event, id) {
+	if (isMobileLayout.value) return
 	if (copyHint.value.activeId !== id) return
 	if (!copyHint.value.visible && !copyHintPositionLocked) {
 		setCopyHintPosition(event)
@@ -253,6 +312,7 @@ function handleCopyHoverMove(event, id) {
 }
 
 function handleCopyHoverLeave(id) {
+	if (isMobileLayout.value) return
 	copyHintPositionLocked = true
 	if (copyHintShowTimer) {
 		clearTimeout(copyHintShowTimer)
@@ -266,15 +326,16 @@ function handleCopyHoverLeave(id) {
 	copyHint.value.activeId = null
 	copyHint.value.visible = false
 	copyHint.value.isCopied = false
+	copyHint.value.maxWidth = null
 }
 
-async function copyLink(domain, slug, linkId) {
+async function copyLink(domain, slug, linkId, event) {
 	const fullLink = `https://${domain}/${slug}`
 	const hintId = `link-${linkId}`
-	
+
 	try {
 		await navigator.clipboard.writeText(fullLink)
-		showCopiedFeedback(hintId)
+		showCopiedFeedback(hintId, event)
 	} catch (err) {
 		console.error('Failed to copy link:', err)
 		const textArea = document.createElement('textarea')
@@ -285,7 +346,7 @@ async function copyLink(domain, slug, linkId) {
 		textArea.select()
 		try {
 			document.execCommand('copy')
-			showCopiedFeedback(hintId)
+			showCopiedFeedback(hintId, event)
 		} catch (fallbackErr) {
 			console.error('Fallback copy failed:', fallbackErr)
 		}
@@ -293,31 +354,38 @@ async function copyLink(domain, slug, linkId) {
 	}
 }
 
-function showCopiedFeedback(id) {
+function showCopiedFeedback(id, event = null) {
 	if (copyHintResetTimer) {
 		clearTimeout(copyHintResetTimer)
 		copyHintResetTimer = null
 	}
 	copyHint.value.activeId = id
+	if (isMobileLayout.value && event) {
+		setCopyHintPositionFromTap(event)
+	} else {
+		copyHint.value.maxWidth = null
+	}
 	copyHint.value.visible = true
 	copyHint.value.isCopied = true
 	copyHintResetTimer = setTimeout(() => {
 		copyHint.value.isCopied = false
-		if (!copyHint.value.activeId) {
+		if (isMobileLayout.value) {
+			copyHint.value.visible = false
+			copyHint.value.activeId = null
+		} else if (!copyHint.value.activeId) {
 			copyHint.value.visible = false
 		}
 	}, 950)
 }
 
-async function copyUrl(url, linkId) {
+async function copyUrl(url, linkId, event) {
 	const popoverId = `url-${linkId}`
-	
+
 	try {
 		await navigator.clipboard.writeText(url)
-		showCopiedFeedback(popoverId)
+		showCopiedFeedback(popoverId, event)
 	} catch (err) {
 		console.error('Failed to copy URL:', err)
-		// Fallback for older browsers
 		const textArea = document.createElement('textarea')
 		textArea.value = url
 		textArea.style.position = 'fixed'
@@ -326,7 +394,7 @@ async function copyUrl(url, linkId) {
 		textArea.select()
 		try {
 			document.execCommand('copy')
-			showCopiedFeedback(popoverId)
+			showCopiedFeedback(popoverId, event)
 		} catch (fallbackErr) {
 			console.error('Fallback copy failed:', fallbackErr)
 		}
@@ -390,6 +458,9 @@ onBeforeRouteLeave((to, from, next) => {
 })
 
 onMounted(() => {
+	mobileMql = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`)
+	isMobileLayout.value = mobileMql.matches
+
 	// Check if we're on a search route
 	if (route.name === 'links-search' && route.params.query) {
 		const searchQuery = decodeURIComponent(route.params.query)
@@ -398,6 +469,13 @@ onMounted(() => {
 	} else {
 		linksStore.fetchLinks()
 	}
+})
+
+onUnmounted(() => {
+	mobileMql = null
+	if (copyHintShowTimer) clearTimeout(copyHintShowTimer)
+	if (copyHintMoveTimer) clearTimeout(copyHintMoveTimer)
+	if (copyHintResetTimer) clearTimeout(copyHintResetTimer)
 })
 </script>
 
@@ -462,9 +540,12 @@ onMounted(() => {
 	min-width: 0;
 }
 
-.link-cell .copy-link-text {
-	display: block;
+.copy-link-text,
+.copy-link.url-ellipsis {
+	display: inline-block;
+	width: min(100%, max-content);
 	max-width: 100%;
+	vertical-align: top;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -511,19 +592,10 @@ onMounted(() => {
 	color: var(--link-hover);
 }
 
-
 .url-cell {
 	overflow: hidden;
 	position: relative;
 	min-width: 0;
-}
-
-.url-ellipsis {
-	display: block;
-	width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 .links-table tbody tr:hover td {
@@ -534,6 +606,10 @@ onMounted(() => {
 	display: flex;
 	gap: 0.5rem;
 	white-space: nowrap;
+}
+
+.link-row-meta {
+	display: none;
 }
 
 .checkmark {
@@ -557,6 +633,23 @@ onMounted(() => {
 	transition: opacity 0.1s ease, transform 0.1s ease;
 	pointer-events: none;
 	z-index: 60;
+	box-sizing: border-box;
+}
+
+.copy-hint:not(.copy-hint-copied):not(.copy-hint--tap) {
+	height: auto;
+	min-height: 24px;
+	align-items: flex-start;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	max-height: min(40vh, 240px);
+	overflow-y: auto;
+}
+
+.copy-hint:not(.copy-hint-copied):not(.copy-hint--tap) .copy-hint-label {
+	display: inline-block;
+	flex: 1;
+	min-width: 0;
 }
 
 .copy-hint-visible {
@@ -565,23 +658,36 @@ onMounted(() => {
 }
 
 .copy-hint-label {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
+	display: inline;
 	font-size: 12px;
-	white-space: nowrap;
+	line-height: 1.35;
 	color: var(--text-primary);
 }
 
 .copy-hint-value {
-	white-space: nowrap;
+	display: inline;
+	margin-left: 4px;
 	text-align: left;
 	font-family: monospace;
 	font-style: italic;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.copy-hint-copied,
+.copy-hint--tap.copy-hint-visible {
+	height: 24px;
+	align-items: center;
+}
+
+.copy-hint-copied .copy-hint-label,
+.copy-hint--tap.copy-hint-visible .copy-hint-label {
+	white-space: nowrap;
 }
 
 .copy-hint-icon-track {
 	position: relative;
+	flex-shrink: 0;
 	height: 16px;
 	width: 16px;
 	overflow: hidden;
@@ -612,5 +718,139 @@ onMounted(() => {
 
 .copy-hint-copied .copy-hint-icon:last-child {
 	transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+	.links-view {
+		padding: 0.75rem;
+		border-radius: 0;
+	}
+
+	.header {
+		flex-direction: column;
+		align-items: stretch;
+		margin-bottom: 1rem;
+		gap: 0.75rem;
+	}
+
+	.search {
+		width: 100%;
+		min-width: 0;
+	}
+
+	.header .btn-primary {
+		width: 100%;
+	}
+
+	.links-table,
+	.links-table tbody {
+		display: block;
+		width: 100%;
+	}
+
+	.links-table {
+		table-layout: auto;
+	}
+
+	.links-table thead {
+		display: none;
+	}
+
+	.links-table tbody tr.link-row {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		grid-template-areas:
+			'link actions'
+			'url url'
+			'meta meta';
+		gap: 0.35rem 0.5rem;
+		padding: 0.75rem;
+		border-bottom: 1px solid var(--bg-border);
+	}
+
+	.links-table tbody tr.link-row:hover td {
+		background: transparent;
+	}
+
+	.links-table tbody tr.link-row:hover {
+		background: color-mix(in srgb, var(--bg-tertiary) 65%, transparent);
+	}
+
+	.links-table td {
+		display: block;
+		padding: 0;
+		border-bottom: none;
+		min-width: 0;
+	}
+
+	.links-table td.col-link {
+		grid-area: link;
+		width: auto;
+	}
+
+	.links-table td.col-url {
+		grid-area: url;
+		width: auto;
+	}
+
+	.links-table td.col-clicks,
+	.links-table td.col-created,
+	.links-table td.col-expires {
+		display: none;
+	}
+
+	.links-table td.col-actions {
+		grid-area: actions;
+		width: auto;
+		min-width: 0;
+		align-self: start;
+		justify-content: flex-end;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.5rem;
+	}
+
+	.links-table td.col-actions::before {
+		display: none;
+	}
+
+	.link-row-meta {
+		display: none;
+	}
+
+	.links-table td.link-row-meta {
+		grid-area: meta;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--text-secondary);
+	}
+
+	.link-row-meta span::before {
+		color: var(--text-tertiary);
+		font-weight: 500;
+	}
+
+	.link-row-meta .meta-clicks::before {
+		content: 'Clicks: ';
+	}
+
+	.link-row-meta .meta-created::before {
+		content: 'Created: ';
+	}
+
+	.link-row-meta .meta-expires::before {
+		content: 'Expires: ';
+	}
+
+	.pagination {
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+	}
+
+	.copy-hint--tap {
+		z-index: 100;
+	}
 }
 </style>

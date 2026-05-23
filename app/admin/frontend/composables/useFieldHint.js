@@ -9,7 +9,8 @@ export function useFieldHint() {
 		items: [],
 		placement: 'top',
 		seeMoreHref: null,
-		seeMoreLabel: 'See more'
+		seeMoreLabel: 'See more',
+		showDismiss: false
 	})
 
 	function show({
@@ -19,7 +20,8 @@ export function useFieldHint() {
 		items = [],
 		placement = 'top',
 		seeMoreHref = null,
-		seeMoreLabel = 'See more'
+		seeMoreLabel = 'See more',
+		showDismiss = false
 	}) {
 		if (!anchor) return
 		state.anchor = markRaw(anchor)
@@ -29,6 +31,7 @@ export function useFieldHint() {
 		state.placement = placement
 		state.seeMoreHref = seeMoreHref
 		state.seeMoreLabel = seeMoreLabel
+		state.showDismiss = showDismiss
 		state.open = true
 	}
 
@@ -40,6 +43,7 @@ export function useFieldHint() {
 		state.placement = 'top'
 		state.seeMoreHref = null
 		state.seeMoreLabel = 'See more'
+		state.showDismiss = false
 	}
 
 	return { state, show, hide }

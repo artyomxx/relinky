@@ -1,6 +1,6 @@
 <template>
-	<div class="modal-overlay" @click.self="handleOverlayClick">
-		<div class="modal">
+	<div class="modal-overlay link-form-modal-overlay" @click.self="handleOverlayClick">
+		<div class="modal link-form-modal">
 			<h2>{{ link ? 'Edit Link' : 'Create Link' }}</h2>
 			<form
 				ref="formRef"
@@ -190,6 +190,8 @@
 			:placement="fieldHint.state.placement"
 			:see-more-href="fieldHint.state.seeMoreHref"
 			:see-more-label="fieldHint.state.seeMoreLabel"
+			:show-dismiss="fieldHint.state.showDismiss"
+			@dismiss="fieldHint.hide"
 		/>
 	</div>
 </template>
@@ -462,15 +464,41 @@ async function initializeForm() {
 // Store the bound function so we can remove it properly
 const boundHandleEscape = (event) => handleEscape(event)
 
+let savedScrollY = 0
+
+function lockPageScroll() {
+	savedScrollY = window.scrollY
+	document.documentElement.style.overflow = 'hidden'
+	document.body.style.overflow = 'hidden'
+	document.body.style.position = 'fixed'
+	document.body.style.top = `-${savedScrollY}px`
+	document.body.style.left = '0'
+	document.body.style.right = '0'
+	document.body.style.width = '100%'
+}
+
+function unlockPageScroll() {
+	document.documentElement.style.overflow = ''
+	document.body.style.overflow = ''
+	document.body.style.position = ''
+	document.body.style.top = ''
+	document.body.style.left = ''
+	document.body.style.right = ''
+	document.body.style.width = ''
+	window.scrollTo(0, savedScrollY)
+}
+
 // Expose bound function so parent can remove/add listener
 defineExpose({ hasChanges, boundHandleEscape })
 
 onMounted(() => {
+	lockPageScroll()
 	window.addEventListener('keydown', boundHandleEscape)
 })
 
 onUnmounted(() => {
 	window.removeEventListener('keydown', boundHandleEscape)
+	unlockPageScroll()
 	dismissUnsavedWarning()
 	initializedFormKey.value = null
 })
@@ -593,7 +621,8 @@ async function checkUrl() {
 		variant: 'info',
 		placement: 'right',
 		seeMoreHref,
-		seeMoreLabel: 'Details →'
+		seeMoreLabel: 'Details in new tab...',
+		showDismiss: true
 	})
 	return true
 }
@@ -760,6 +789,94 @@ async function handleSubmit() {
 .label-disabled {
 	color: #858585;
 	opacity: 0.6;
+}
+
+@media (max-width: 640px) {
+	.link-form-modal-overlay {
+		align-items: stretch;
+		justify-content: stretch;
+		padding: 0;
+	}
+
+	.link-form-modal {
+		width: 100%;
+		max-width: none;
+		height: 100%;
+		max-height: none;
+		border-radius: 0;
+		padding: 1rem 1rem 0;
+		padding-top: max(1rem, env(safe-area-inset-top));
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.link-form-modal h2 {
+		flex-shrink: 0;
+		margin-bottom: 1rem;
+		font-size: 1.125rem;
+	}
+
+	.link-form-modal-form {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.link-form-modal-tabs {
+		flex-shrink: 0;
+		margin-bottom: 1rem;
+	}
+
+	.link-form-modal-tabs .tab-button {
+		flex: 1;
+		padding: 0.5rem 0.35rem;
+		font-size: 0.875rem;
+	}
+
+	.link-form-tab-panels {
+		flex: 1;
+		min-height: 0;
+		margin-top: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.link-form-tab-viewport {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.domain-slug-row {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.35rem;
+	}
+
+	.domain-slug-row .separator {
+		display: none;
+	}
+
+	.form-actions {
+		flex-shrink: 0;
+		flex-wrap: wrap;
+		margin-top: 1rem;
+		padding-bottom: max(0.5em, env(safe-area-inset-bottom));
+		gap: 0.5rem;
+	}
+
+	.form-status-bar {
+		flex: 1 1 100%;
+		margin-right: 0;
+	}
+
+	.form-actions button {
+		flex: 1;
+		min-width: 0;
+	}
 }
 
 </style>
