@@ -187,13 +187,13 @@ table td, table th {
 }
 
 /* Global link styles - applies to text links only, excludes button-links */
-a:not(.nav-link):not(.tab-link):not(.tab-button):not(.btn-action):not(.copy-btn-text):not(.copy-link-text):not(.link-danger):not(.link-white) {
+a {
 	color: var(--link-base);
 	text-decoration: underline;
 	cursor: pointer;
 }
 
-a:not(.nav-link):not(.tab-link):not(.tab-button):not(.btn-action):not(.copy-btn-text):not(.copy-link-text):not(.link-danger):not(.link-white):hover {
+a:hover {
 	color: var(--link-hover);
 }
 
