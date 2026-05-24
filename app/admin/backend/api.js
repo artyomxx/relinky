@@ -222,10 +222,13 @@ export function setupAuthRoutes(router, auth) {
 			const pwd = body?.password
 			const result = auth.login(pwd)
 			if (result.success) {
+				const clientInfo = getClientInfo(req)
 				if (auth.isAdminLoginDebug()) {
-					const info = getClientInfo(req)
-					console.log('[Auth] DEBUG login ok ip=%s', info.ip || '(unknown)')
+					console.log('[Auth] DEBUG login ok ip=%s', clientInfo.ip || '(unknown)')
 				}
+				const logsDb = getLogsDb()
+				logAction(logsDb, 'main_logs', 'signed in', null, clientInfo)
+				logsDb.close()
 				sendJson(res, 200, { token: result.token })
 			} else {
 				if (auth.isAdminLoginDebug()) {
@@ -252,10 +255,14 @@ export function setupAuthRoutes(router, auth) {
 	})
 
 	router.post('/api/auth/logout', (req, res) => {
+		const clientInfo = getClientInfo(req)
 		const token = auth.requireAuth(req)
 		if (token) {
 			auth.deleteSession(token)
 		}
+		const logsDb = getLogsDb()
+		logAction(logsDb, 'main_logs', 'signed out', null, clientInfo)
+		logsDb.close()
 		sendJson(res, 200, { success: true })
 	})
 

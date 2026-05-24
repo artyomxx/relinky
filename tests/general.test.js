@@ -131,6 +131,31 @@ test('logout invalidates the session token', { concurrency: false }, async () =>
 	assert.equal(check.status, 401)
 })
 
+test('login and logout write main auth logs', { concurrency: false }, async () => {
+	const token = await adminLogin()
+	const out = await req(pathAuthLogout, { method: 'POST', token })
+	assert.equal(out.status, 200)
+
+	const auditToken = await adminLogin()
+	const signedIn = await req(`${pathLogs}?eventType=main&action=signed%20in&limit=50`, {
+		token: auditToken
+	})
+	assert.equal(signedIn.status, 200)
+	assert.ok(
+		signedIn.data.logs.some(log => log.log_type === 'main' && log.action === 'signed in'),
+		'expected a signed in main log'
+	)
+
+	const signedOut = await req(`${pathLogs}?eventType=main&action=signed%20out&limit=50`, {
+		token: auditToken
+	})
+	assert.equal(signedOut.status, 200)
+	assert.ok(
+		signedOut.data.logs.some(log => log.log_type === 'main' && log.action === 'signed out'),
+		'expected a signed out main log'
+	)
+})
+
 test('GET settings returns settings and defaults objects', { concurrency: false }, async () => {
 	const token = await adminLogin()
 	const res = await req(pathSettings, { token })
