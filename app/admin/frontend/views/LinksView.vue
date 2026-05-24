@@ -171,6 +171,13 @@ watch(() => route.name, (routeName) => {
 	}
 }, { immediate: true })
 
+function linksListPath() {
+	if (linksStore.search) {
+		return `/links/search/${encodeURIComponent(linksStore.search)}`
+	}
+	return '/links'
+}
+
 async function fetchLinkForEdit(id) {
 	try {
 		const response = await authStore.authedFetch(`/api/links/${id}`, {
@@ -183,7 +190,7 @@ async function fetchLinkForEdit(id) {
 		}
 	} catch (err) {
 		console.error('Error fetching link:', err)
-		router.push('/links')
+		router.push(linksListPath())
 	}
 }
 
@@ -291,10 +298,9 @@ async function deleteLink(link) {
 }
 
 function closeModal() {
-	// Just clear state and navigate - the modal handles showing the hint
 	showCreateModal.value = false
 	editingLink.value = null
-	router.push('/links')
+	router.push(linksListPath())
 }
 
 // Watch for search input changes and update route
