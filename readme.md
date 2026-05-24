@@ -164,7 +164,7 @@ After startup:
 
 1. Open `https://admin.example.com`
 2. Log in
-3. Add redirect domains in Settings
+3. Add redirect domains in **Domains**
 4. Ensure those domains resolve to the same server
 5. Relinky regenerates Caddy config and reloads Caddy automatically
 
@@ -207,9 +207,10 @@ Checklist:
 2. Build pack: Docker Compose, file [`docker-compose.coolify.yml`](./docker-compose.coolify.yml). Note that by default Coolify offers `.yaml` extension, so change the whole file name.
 3. Provide `ADMIN_PASSWORD_HASH_B64` — Base64-encoded hash. `ADMIN_PASSWORD_HASH` doesn't work with current version of Coolify because `$` symbols are mangld in Coolify's environment variables.
 4. Ensure the persistent storage for `./db` is attached to both services (should happen automatically)
-5. Setup admin and redirect domains in **General -> Domains**:
+5. Setup admin and redirect domains in Coolify and the admin UI:
    - Admin service: one admin hostname, for example `https://admin.example.com:8081`
    - Redirect service: one or many redirect hostnames, for example `https://link.example.com:8082, https://dl.example.com:8082`
+   - In the panel, add redirect hostnames under **Domains**
    - Important: keep in mind Coolify expects full links with protocols and ports like shown above, don't enter only domains.
 
 ---
@@ -240,7 +241,7 @@ Then set `ADMIN_PASSWORD_HASH_B64` instead of raw hash.
 
 ## External Automation API
 
-Create keys in `Settings -> General -> API Keys`.
+Create keys in **Tools → API keys**.
 
 Capabilities:
 
