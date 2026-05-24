@@ -78,10 +78,10 @@
 						</div>
 					</div>
 
-					<div class="log-card-row log-card-row-detail">
+					<div v-if="log.diff && log.diff.length > 0" class="log-card-row log-card-row-detail">
 						<span class="log-card-kicker">Changes</span>
 						<div class="log-card-body">
-							<ul v-if="log.diff && log.diff.length > 0" class="diff-list">
+							<ul class="diff-list">
 								<li v-for="change in log.diff" :key="change.what">
 									{{ change.what }}:
 									<span v-if="hasDiffValue(change.before) && hasDiffValue(change.after)" class="diff-change">
@@ -93,7 +93,6 @@
 									<span v-else-if="hasDiffValue(change.after)">{{ formatDiffValue(change.what, change.after) }}</span>
 								</li>
 							</ul>
-							<span v-else class="no-diff">—</span>
 						</div>
 					</div>
 
@@ -136,7 +135,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useLogsStore } from '../stores/logs.js'
-import { formatDateYMD } from '../utils/date.js'
+import { formatDateYMD, formatDateTimeLocal, formatUtcOffsetLabel, parseTimestamp } from '../utils/date.js'
 
 const logsStore = useLogsStore()
 
@@ -154,17 +153,14 @@ function changePage(page) {
 }
 
 function formatTimestamp(timestamp) {
-	if (!timestamp) return '—'
-	const date = new Date(timestamp)
-	if (Number.isNaN(date.getTime())) return '—'
-	return date.toISOString().replace('T', ' ').slice(0, 16)
+	const date = parseTimestamp(timestamp)
+	if (!date) return '—'
+	return `${formatDateTimeLocal(timestamp)} ${formatUtcOffsetLabel(date)}`
 }
 
 function logTimestampIso(timestamp) {
-	if (!timestamp) return undefined
-	const date = new Date(timestamp)
-	if (Number.isNaN(date.getTime())) return undefined
-	return date.toISOString()
+	const date = parseTimestamp(timestamp)
+	return date ? date.toISOString() : undefined
 }
 
 function hasDiffValue(value) {
@@ -175,11 +171,8 @@ function formatDiffValue(what, value) {
 	const text = String(value)
 	const field = String(what || '').toLowerCase()
 	if (field.includes('expire') || field.includes('date') || field.includes('timestamp')) {
-		if (/^\d{13}$/.test(text)) {
-			return formatDateYMD(Number(text))
-		}
-		if (/^\d{10}$/.test(text)) {
-			return formatDateYMD(Number(text) * 1000)
+		if (/^\d{10,13}$/.test(text)) {
+			return formatDateYMD(text)
 		}
 	}
 	return text
@@ -390,10 +383,6 @@ onMounted(() => {
 
 .diff-arrow {
 	color: var(--text-primary);
-}
-
-.no-diff {
-	color: var(--text-secondary);
 }
 
 .log-card-net-line {
