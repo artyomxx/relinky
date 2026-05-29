@@ -1,11 +1,16 @@
 import Database from 'better-sqlite3'
 import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { dirname, join, resolve } from 'path'
 import { mkdirSync } from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const dbPath = join(__dirname, '../../db')
+
+// RELINKY_DB_DIR lets tests (and alternative deployments) point at an isolated db
+// directory instead of the repo-local ../../db.
+const dbPath = process.env.RELINKY_DB_DIR
+	? resolve(process.env.RELINKY_DB_DIR)
+	: join(__dirname, '../../db')
 
 // Ensure db directory exists
 try {
