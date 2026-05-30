@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { adminListenHost, devPasswordHash, pathHealthcheck } from './constants.js'
 
@@ -10,8 +13,21 @@ const BIND_ENV_KEYS = [
 	'REDIRECTOR_IP',
 	'REDIRECTOR_PORT',
 	'ADMIN_PASSWORD_HASH',
-	'ADMIN_PASSWORD_HASH_B64'
+	'ADMIN_PASSWORD_HASH_B64',
+	'RELINKY_DB_DIR'
 ]
+
+/**
+ * One isolated database directory per test-file process so the suite never touches the
+ * repo's real db/. node --test runs each file in its own process, so admin and redirector
+ * spawned within the same file share this dir, while different files stay isolated.
+ */
+const testDbDir = mkdtempSync(join(tmpdir(), 'relinky-test-db-'))
+process.on('exit', () => {
+	try {
+		rmSync(testDbDir, { recursive: true, force: true })
+	} catch {}
+})
 
 /**
  * Optional fixed ports for debugging (e.g. when random ports are blocked):
@@ -64,7 +80,7 @@ export function buildTestEnv(overrides = {}) {
 	for (const key of BIND_ENV_KEYS) {
 		delete env[key]
 	}
-	return { ...env, ...overrides }
+	return { ...env, RELINKY_DB_DIR: testDbDir, ...overrides }
 }
 
 export function buildAdminTestEnv(port) {
