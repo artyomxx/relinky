@@ -16,6 +16,18 @@
 name: relinky
 
 services:
+  # One-shot migrator. Both services start only after this exits 0, so migrations run
+  # exactly once instead of both containers racing on the shared db/ volume (SQLITE_BUSY).
+  relinky_migrate:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./db:/app/db
+    entrypoint: ["node", "/app/app/shared/init-db.js"]
+    restart: "no"
+
   relinky_admin:
     build: .
     env_file:
@@ -23,6 +35,9 @@ services:
         required: false
     volumes:
       - ./db:/app/db
+    depends_on:
+      relinky_migrate:
+        condition: service_completed_successfully
     environment:
       # Set ADMIN_PASSWORD_HASH ($6$…) and/or ADMIN_PASSWORD_HASH_B64 (base64 of that string).
       # Coolify can mangle `$` in “Literal” vars; use B64 only if logs show startsWith$6$=false.
@@ -33,7 +48,7 @@ services:
       - ADMIN_PORT=8081
       # Triggers Coolify URL/FQDN generation + proxy routing to 8081 (Git-based compose needs Coolify ≥ beta.411).
       - SERVICE_URL_RELINKY_ADMIN_8081
-    entrypoint: ["/bin/sh", "-c", "node /app/app/shared/init-db.js && exec node /app/app/admin/backend/server.js"]
+    entrypoint: ["node", "/app/app/admin/backend/server.js"]
     ports:
       - "8081:8081"
     healthcheck:
@@ -57,11 +72,14 @@ services:
         required: false
     volumes:
       - ./db:/app/db
+    depends_on:
+      relinky_migrate:
+        condition: service_completed_successfully
     environment:
       - REDIRECTOR_IP=0.0.0.0
       - REDIRECTOR_PORT=8082
       - SERVICE_URL_RELINKY_REDIRECT_8082
-    entrypoint: ["/bin/sh", "-c", "node /app/app/shared/init-db.js && exec node /app/app/redirector/server.js"]
+    entrypoint: ["node", "/app/app/redirector/server.js"]
     ports:
       - "8082:8082"
     healthcheck:
