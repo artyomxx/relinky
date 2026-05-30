@@ -303,6 +303,7 @@ Optional:
 - `ADMIN_PORT` (default `8081`) — Listen port for admin HTTP server.
 - `REDIRECTOR_IP` — Bind address for redirector HTTP server.
 - `REDIRECTOR_PORT` (default `8082`) — Listen port for redirector HTTP server.
+- `RELINKY_DB_DIR` — Override the SQLite database directory (defaults to the repo-local `db/`). Useful for isolated test runs or non-standard layouts; in Docker the `db/` volume is the persistent location.
 
 ### Gateway mode only ([`docker-compose.gateway.yml`](./docker-compose.gateway.yml))
 
@@ -344,6 +345,12 @@ npm run test:spec
 ```
 
 `npm run dev` uses a fixed development hash where password is `dev`.
+
+### Database migrations
+
+Schema changes are applied automatically on startup — no manual step. Each SQLite file tracks its own version (`PRAGMA user_version`) and only the missing migrations run, inside a transaction, so existing databases upgrade in place without data loss. Migrations live in [`app/shared/migrations/`](./app/shared/migrations) and are run by [`app/shared/init-db.js`](./app/shared/init-db.js); to add one, append it to the relevant file's list.
+
+After switching Node versions, rebuild the native SQLite binding: `npm rebuild better-sqlite3`.
 
 ---
 
