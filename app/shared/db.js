@@ -25,27 +25,31 @@ try {
 	// Directory might already exist, ignore
 }
 
-export function getMainDb() {
-	const db = new Database(mainDbPath)
+// Both the admin and redirector services open these DBs (and both run migrations on
+// boot), so concurrent writers are expected. Without busy_timeout a writer that loses
+// the race fails immediately with SQLITE_BUSY; with it, the writer waits for the lock.
+const busyTimeoutMs = parseInt(process.env.RELINKY_DB_BUSY_TIMEOUT_MS || '5000', 10)
+
+function openDb(path) {
+	const db = new Database(path)
+	db.pragma(`busy_timeout = ${busyTimeoutMs}`)
 	db.pragma('journal_mode = WAL')
 	return db
+}
+
+export function getMainDb() {
+	return openDb(mainDbPath)
 }
 
 export function getRedirectablesDb() {
-	const db = new Database(redirectablesDbPath)
-	db.pragma('journal_mode = WAL')
-	return db
+	return openDb(redirectablesDbPath)
 }
 
 export function getStatsDb() {
-	const db = new Database(statsDbPath)
-	db.pragma('journal_mode = WAL')
-	return db
+	return openDb(statsDbPath)
 }
 
 export function getLogsDb() {
-	const db = new Database(logsDbPath)
-	db.pragma('journal_mode = WAL')
-	return db
+	return openDb(logsDbPath)
 }
 

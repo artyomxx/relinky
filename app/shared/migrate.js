@@ -33,12 +33,27 @@ export function runMigrations(db, migrations, { label = 'db', log = console.log 
 	for (let i = current; i < migrations.length; i++) {
 		const migration = migrations[i]
 		const targetVersion = i + 1
+		let applied = false
 		const apply = db.transaction(() => {
+			// Re-check under the write lock: admin and redirector both run migrations on
+			// boot, so another process may have applied this version between our initial
+			// read and acquiring the lock. Without this, a non-idempotent migration could
+			// run twice (and setUserVersion could walk the version backwards).
+			if (getUserVersion(db) >= targetVersion) {
+				return
+			}
 			migration.up(db)
 			setUserVersion(db, targetVersion)
+			applied = true
 		})
-		apply()
-		log(`[Migrate] ${label}: applied v${targetVersion} (${migration.name})`)
+		// BEGIN IMMEDIATE takes the write lock at the start of the transaction. Migration
+		// up() is often a no-op on an already-migrated DB (CREATE TABLE IF NOT EXISTS), so a
+		// deferred transaction would stay a reader until setUserVersion and then deadlock if
+		// another process is upgrading its own deferred lock at the same time.
+		apply.immediate()
+		if (applied) {
+			log(`[Migrate] ${label}: applied v${targetVersion} (${migration.name})`)
+		}
 	}
 
 	return getUserVersion(db)

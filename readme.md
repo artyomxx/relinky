@@ -304,6 +304,7 @@ Optional:
 - `REDIRECTOR_IP` — Bind address for redirector HTTP server.
 - `REDIRECTOR_PORT` (default `8082`) — Listen port for redirector HTTP server.
 - `RELINKY_DB_DIR` — Override the SQLite database directory (defaults to the repo-local `db/`). Useful for isolated test runs or non-standard layouts; in Docker the `db/` volume is the persistent location.
+- `RELINKY_DB_BUSY_TIMEOUT_MS` (default `5000`) — How long a SQLite connection waits for a busy database lock before erroring. The admin and redirector both run migrations on boot, so this lets the second writer wait instead of failing with `SQLITE_BUSY`.
 
 ### Gateway mode only ([`docker-compose.gateway.yml`](./docker-compose.gateway.yml))
 
