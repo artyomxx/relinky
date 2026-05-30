@@ -97,10 +97,6 @@ defineProps({
 	font-size: 0.875rem;
 }
 
-.stat-line strong {
-	color: var(--text-tertiary);
-}
-
 .preview-stats button {
 	margin-top: 1rem;
 }
