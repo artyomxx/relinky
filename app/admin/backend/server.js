@@ -15,17 +15,18 @@ import {
 	setupLogsRoutes
 } from './api.js'
 import { listenServer } from '../../shared/http-listen.js'
+import { assertSchemaCurrent } from '../../shared/check-schema.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-// Initialize databases on startup - must complete before starting server
-console.log('[Admin] Initializing databases...')
+// Migrations run as a separate deploy step (start.js / gateway entrypoint / compose
+// migrate service). Verify the schema is current and fail fast if it is not.
 try {
-	await import('../../shared/init-db.js')
-	console.log('[Admin] Databases initialized successfully')
+	assertSchemaCurrent()
+	console.log('[Admin] Database schema verified')
 } catch (err) {
-	console.error('[Admin] Error initializing databases:', err)
+	console.error('[Admin]', err.message)
 	process.exit(1)
 }
 

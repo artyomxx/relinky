@@ -4,13 +4,15 @@ import statsQueue from './stats-queue.js'
 import { startWatcher, stopWatcher } from './watcher.js'
 import { getRedirectablesDb } from '../shared/db.js'
 import { listenServer } from '../shared/http-listen.js'
+import { assertSchemaCurrent } from '../shared/check-schema.js'
 
-// Initialize databases on startup
+// Migrations run as a separate deploy step (start.js / gateway entrypoint / compose
+// migrate service). Verify the schema is current and fail fast if it is not.
 try {
-	await import('../shared/init-db.js')
-	console.log('[Redirector] Databases initialized')
+	assertSchemaCurrent()
+	console.log('[Redirector] Database schema verified')
 } catch (err) {
-	console.error('[Redirector] Error initializing databases:', err)
+	console.error('[Redirector]', err.message)
 	process.exit(1)
 }
 

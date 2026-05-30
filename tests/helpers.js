@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -28,6 +28,17 @@ process.on('exit', () => {
 		rmSync(testDbDir, { recursive: true, force: true })
 	} catch {}
 })
+
+// Services verify the schema on boot but no longer migrate themselves, so run the
+// migrator once (per test-file process) against this dir before any server is spawned.
+const migrate = spawnSync('node', ['app/shared/init-db.js'], {
+	cwd: process.cwd(),
+	env: { ...process.env, RELINKY_DB_DIR: testDbDir },
+	encoding: 'utf8'
+})
+if (migrate.status !== 0) {
+	throw new Error(`test db init failed (exit ${migrate.status}):\n${migrate.stderr}`)
+}
 
 /**
  * Optional fixed ports for debugging (e.g. when random ports are blocked):

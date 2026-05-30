@@ -305,6 +305,7 @@ Optional:
 - `REDIRECTOR_PORT` (default `8082`) — Listen port for redirector HTTP server.
 - `RELINKY_DB_DIR` — Override the SQLite database directory (defaults to the repo-local `db/`). Useful for isolated test runs or non-standard layouts; in Docker the `db/` volume is the persistent location.
 - `RELINKY_DB_BUSY_TIMEOUT_MS` (default `5000`) — How long a SQLite connection waits for a busy database lock before erroring. The admin and redirector both run migrations on boot, so this lets the second writer wait instead of failing with `SQLITE_BUSY`.
+- `RELINKY_DB_BACKUP_KEEP` (default `10`, `0` = keep all) — How many pre-migration backups to retain per database in `db/backups/`. Older snapshots beyond this count are pruned automatically.
 
 ### Gateway mode only ([`docker-compose.gateway.yml`](./docker-compose.gateway.yml))
 
@@ -349,7 +350,13 @@ npm run test:spec
 
 ### Database migrations
 
-Schema changes are applied automatically on startup — no manual step. Each SQLite file tracks its own version (`PRAGMA user_version`) and only the missing migrations run, inside a transaction, so existing databases upgrade in place without data loss. Migrations live in [`app/shared/migrations/`](./app/shared/migrations) and are run by [`app/shared/init-db.js`](./app/shared/init-db.js); to add one, append it to the relevant file's list.
+Schema changes are applied automatically — no manual step. Each SQLite file tracks its own version (`PRAGMA user_version`) and only the missing migrations run, inside a transaction, so existing databases upgrade in place without data loss. Migrations live in [`app/shared/migrations/`](./app/shared/migrations) and are run by [`app/shared/init-db.js`](./app/shared/init-db.js); to add one, append it to the relevant file's list.
+
+Migrations run **once per deployment as a dedicated step**, not inside each service: the all-in-one image runs them in [`start.js`](./start.js) (and the gateway entrypoint) before launching the admin and redirector; the multi-container Coolify compose uses a one-shot `relinky_migrate` service that the others wait on (`depends_on: condition: service_completed_successfully`). The admin and redirector then only **verify** the schema is current on boot and exit with an error if a migration was skipped — they never migrate concurrently, which avoids `SQLITE_BUSY` on a shared volume.
+
+Before upgrading a database that already has data, init-db takes a consistent snapshot (via SQLite's online backup) into a `backups/` folder inside the database directory — `db/backups/` by default, or `$RELINKY_DB_DIR/backups/` when that override is set — named `<db>.<timestamp>.v<from-version>.<pid>.db`. Backups are only created when a migration is actually pending, never on a fresh install or an ordinary restart. If the backup cannot be written, startup aborts rather than migrating without a restore point. Retention is controlled by `RELINKY_DB_BACKUP_KEEP`.
+
+To restore a snapshot: stop the services, replace the live file (e.g. copy `db/backups/main.<…>.db` over `db/main.db`), delete any leftover `db/main.db-wal` / `db/main.db-shm`, then start again.
 
 After switching Node versions, rebuild the native SQLite binding: `npm rebuild better-sqlite3`.
 
