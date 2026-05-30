@@ -16,7 +16,7 @@ import {
 	pathLinksCheckUrlBase,
 	pathLinksCheckSlugBase,
 	pathLogs,
-	pathSettings,
+	pathDefaults,
 	pathStats
 } from './constants.js'
 import {
@@ -156,9 +156,9 @@ test('login and logout write main auth logs', { concurrency: false }, async () =
 	)
 })
 
-test('GET settings returns settings and defaults objects', { concurrency: false }, async () => {
+test('GET domain defaults returns settings and defaults objects', { concurrency: false }, async () => {
 	const token = await adminLogin()
-	const res = await req(pathSettings, { token })
+	const res = await req(pathDefaults, { token })
 	assert.equal(res.status, 200)
 	assert.ok(res.data?.settings && typeof res.data.settings === 'object')
 	assert.ok(res.data?.defaults && typeof res.data.defaults === 'object')

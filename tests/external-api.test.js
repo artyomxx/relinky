@@ -13,8 +13,8 @@ import {
 	pathExternalStats,
 	pathHealthcheck,
 	pathLinks,
-	pathSettings,
-	pathSettingsApiKeys,
+	pathDefaults,
+	pathApiKeys,
 	pathStats
 } from './constants.js'
 import {
@@ -86,7 +86,7 @@ async function cleanupDomain(adminToken, domain) {
 }
 
 async function createApiKey(adminToken, payload = {}) {
-	const response = await req(pathSettingsApiKeys, {
+	const response = await req(pathApiKeys, {
 		method: 'POST',
 		token: adminToken,
 		body: {
@@ -102,7 +102,7 @@ async function createApiKey(adminToken, payload = {}) {
 
 async function deleteApiKey(adminToken, keyId) {
 	if (!keyId) return
-	await req(`${pathSettingsApiKeys}/${keyId}`, {
+	await req(`${pathApiKeys}/${keyId}`, {
 		method: 'DELETE',
 		token: adminToken
 	})
@@ -166,7 +166,7 @@ test('external api key cannot access admin settings route', { concurrency: false
 	const adminToken = await adminLogin()
 	const { key, token } = await createApiKey(adminToken, { name: 'settings-deny-check' })
 	try {
-		assert.equal((await req(pathSettings, { token })).status, 401)
+		assert.equal((await req(pathDefaults, { token })).status, 401)
 	} finally {
 		await deleteApiKey(adminToken, key.id)
 	}
@@ -179,12 +179,12 @@ test('api key is rejected on non-external api routes', { concurrency: false }, a
 	const { key, token } = await createApiKey(adminToken, { name: 'non-external-deny-check' })
 	try {
 		const checks = [
-			{ path: pathSettings, method: 'GET' },
+			{ path: pathDefaults, method: 'GET' },
 			{ path: pathDomains, method: 'GET' },
 			{ path: `${pathLinks}?page=1&limit=5`, method: 'GET' },
 			{ path: `${pathStats}?period=day`, method: 'GET' },
 			{ path: pathAuthCheck, method: 'GET' },
-			{ path: pathSettingsApiKeys, method: 'GET' },
+			{ path: pathApiKeys, method: 'GET' },
 			{
 				path: pathDomains,
 				method: 'POST',
@@ -210,7 +210,7 @@ test('disabled external api key is rejected', { concurrency: false }, async () =
 	const adminToken = await adminLogin()
 	const { key, token } = await createApiKey(adminToken, { name: 'disable-check' })
 	try {
-		assert.equal((await req(`${pathSettingsApiKeys}/${key.id}`, {
+		assert.equal((await req(`${pathApiKeys}/${key.id}`, {
 			method: 'PUT',
 			token: adminToken,
 			body: { enabled: false }
@@ -225,14 +225,14 @@ test('external api key respects IP allowlist', { concurrency: false }, async () 
 	const adminToken = await adminLogin()
 	const { key, token } = await createApiKey(adminToken, { name: 'allowlist-check' })
 	try {
-		assert.equal((await req(`${pathSettingsApiKeys}/${key.id}`, {
+		assert.equal((await req(`${pathApiKeys}/${key.id}`, {
 			method: 'PUT',
 			token: adminToken,
 			body: { allowed_ips: [blockedAllowlistIp] }
 		})).status, 200)
 		assert.equal((await req(pathExternalLinks, { token })).status, 403)
 
-		assert.equal((await req(`${pathSettingsApiKeys}/${key.id}`, {
+		assert.equal((await req(`${pathApiKeys}/${key.id}`, {
 			method: 'PUT',
 			token: adminToken,
 			body: { allowed_ips: [] }

@@ -1896,9 +1896,9 @@ export function setupDomainRoutes(router, auth) {
 	})
 }
 
-// Settings endpoints
-export function setupSettingsRoutes(router, auth) {
-	router.get('/api/settings', (req, res) => {
+// Global defaults endpoints (error URLs + link defaults shown on the Domains page)
+export function setupDefaultsRoutes(router, auth) {
+	router.get('/api/domains/defaults', (req, res) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
 			return
@@ -1923,7 +1923,7 @@ export function setupSettingsRoutes(router, auth) {
 		sendJson(res, 200, { settings, defaults })
 	})
 
-	router.put('/api/settings', async (req, res) => {
+	router.put('/api/domains/defaults', async (req, res) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
 			return
@@ -2043,7 +2043,7 @@ export function setupSettingsRoutes(router, auth) {
 }
 
 export function setupApiKeyRoutes(router, auth) {
-	router.get('/api/settings/api-keys', (req, res) => {
+	router.get('/api/api-keys', (req, res) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
 			return
@@ -2055,7 +2055,7 @@ export function setupApiKeyRoutes(router, auth) {
 		sendJson(res, 200, { keys: rows.map(toApiKeyResponse) })
 	})
 
-	router.post('/api/settings/api-keys', async (req, res) => {
+	router.post('/api/api-keys', async (req, res) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
 			return
@@ -2095,7 +2095,7 @@ export function setupApiKeyRoutes(router, auth) {
 		}
 	})
 
-	router.put('/api/settings/api-keys/:id', async (req, res, params) => {
+	router.put('/api/api-keys/:id', async (req, res, params) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
 			return
@@ -2149,7 +2149,7 @@ export function setupApiKeyRoutes(router, auth) {
 		}
 	})
 
-	router.post('/api/settings/api-keys/:id/regenerate', (req, res, params) => {
+	router.post('/api/api-keys/:id/regenerate', (req, res, params) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
 			return
@@ -2172,7 +2172,7 @@ export function setupApiKeyRoutes(router, auth) {
 		sendJson(res, 200, { key: toApiKeyResponse(row), token: generated.token })
 	})
 
-	router.delete('/api/settings/api-keys/:id', (req, res, params) => {
+	router.delete('/api/api-keys/:id', (req, res, params) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
 			return

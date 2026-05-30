@@ -60,7 +60,7 @@
 											:class="{ 'field-changed': isFieldChanged('domain') }"
 										>
 											<option value="">Select domain...</option>
-											<option v-for="domain in settingsStore.domains" :key="domain.id" :value="domain.domain">
+											<option v-for="domain in domainsStore.domains" :key="domain.id" :value="domain.domain">
 												{{ domain.domain }}
 											</option>
 										</select>
@@ -200,7 +200,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLinksStore } from '../stores/links.js'
-import { useSettingsStore } from '../stores/settings.js'
+import { useDomainsStore } from '../stores/domains.js'
 import { useFieldHint } from '../composables/useFieldHint.js'
 import FieldHint from './FieldHint.vue'
 
@@ -212,7 +212,7 @@ const emit = defineEmits(['close', 'saved'])
 
 const router = useRouter()
 const linksStore = useLinksStore()
-const settingsStore = useSettingsStore()
+const domainsStore = useDomainsStore()
 
 const DUPLICATE_URL_PREVIEW_LIMIT = 5
 const formDataReady = ref(false)
@@ -402,12 +402,12 @@ async function initializeForm() {
 	dismissUnsavedWarning()
 
 	try {
-		if (settingsStore.domains.length === 0) {
-			await settingsStore.fetchDomains()
+		if (domainsStore.domains.length === 0) {
+			await domainsStore.fetchDomains()
 		}
 
-		if (Object.keys(settingsStore.defaults).length === 0) {
-			await settingsStore.fetchSettings()
+		if (Object.keys(domainsStore.defaults).length === 0) {
+			await domainsStore.fetchDefaults()
 		}
 
 		const link = props.link ? JSON.parse(JSON.stringify(props.link)) : null
@@ -422,15 +422,15 @@ async function initializeForm() {
 				expired_url: link.expired_url || '',
 				expire: hasExpire ? new Date(link.expire).toISOString().slice(0, 16) : '',
 				comment: link.comment || '',
-				redirect_code: link.redirect_code?.toString() || settingsStore.defaults.redirect_code || '303',
-				keep_referrer: link.keep_referrer !== undefined ? link.keep_referrer : (settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true),
-				keep_query_params: link.keep_query_params !== undefined ? link.keep_query_params : (settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true)
+				redirect_code: link.redirect_code?.toString() || domainsStore.defaults.redirect_code || '303',
+				keep_referrer: link.keep_referrer !== undefined ? link.keep_referrer : (domainsStore.defaults.keep_referrer === 'true' || domainsStore.defaults.keep_referrer === true),
+				keep_query_params: link.keep_query_params !== undefined ? link.keep_query_params : (domainsStore.defaults.keep_query_params === 'true' || domainsStore.defaults.keep_query_params === true)
 			}
 		} else {
 			expireEnabled.value = false
 			let defaultDomain = ''
-			if (settingsStore.defaults.default_domain_id) {
-				const domain = settingsStore.domains.find(d => d.id.toString() === settingsStore.defaults.default_domain_id.toString())
+			if (domainsStore.defaults.default_domain_id) {
+				const domain = domainsStore.domains.find(d => d.id.toString() === domainsStore.defaults.default_domain_id.toString())
 				if (domain) {
 					defaultDomain = domain.domain
 				}
@@ -440,12 +440,12 @@ async function initializeForm() {
 				domain: defaultDomain,
 				slug: '',
 				url: '',
-				expired_url: settingsStore.defaults.expired_url || '',
+				expired_url: domainsStore.defaults.expired_url || '',
 				expire: '',
 				comment: '',
-				redirect_code: settingsStore.defaults.redirect_code || '303',
-				keep_referrer: settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true,
-				keep_query_params: settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true
+				redirect_code: domainsStore.defaults.redirect_code || '303',
+				keep_referrer: domainsStore.defaults.keep_referrer === 'true' || domainsStore.defaults.keep_referrer === true,
+				keep_query_params: domainsStore.defaults.keep_query_params === 'true' || domainsStore.defaults.keep_query_params === true
 			}
 		}
 
