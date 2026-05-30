@@ -9,7 +9,7 @@ import {
 	setupLinkRoutes,
 	setupStatsRoutes,
 	setupDomainRoutes,
-	setupSettingsRoutes,
+	setupDefaultsRoutes,
 	setupApiKeyRoutes,
 	setupExternalRoutes,
 	setupLogsRoutes
@@ -38,8 +38,10 @@ const router = new Router()
 setupAuthRoutes(router, auth)
 setupLinkRoutes(router, auth)
 setupStatsRoutes(router, auth)
+// Defaults register before domain routes so /api/domains/defaults is never shadowed by
+// a future /api/domains/:id param route.
+setupDefaultsRoutes(router, auth)
 setupDomainRoutes(router, auth)
-setupSettingsRoutes(router, auth)
 setupApiKeyRoutes(router, auth)
 setupExternalRoutes(router, auth)
 setupLogsRoutes(router, auth)

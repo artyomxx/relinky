@@ -3,8 +3,8 @@
 		<section class="view-group">
 			<h2 class="view-group-title">API keys</h2>
 			<ApiKeys
-				:loading="settingsStore.loading"
-				:api-keys="settingsStore.apiKeys"
+				:loading="toolsStore.loading"
+				:api-keys="toolsStore.apiKeys"
 				:new-api-key-name="newApiKeyName"
 				:new-api-allowed-ips="newApiAllowedIps"
 				:creating-api-key="creatingApiKey"
@@ -37,7 +37,7 @@
 					:exporting="exporting"
 					:export-settings="exportSettings"
 					:export-count="exportCount"
-					:domains="settingsStore.domains"
+					:domains="domainsStore.domains"
 					:export-links="exportLinks"
 				/>
 			</div>
@@ -48,7 +48,8 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSettingsStore } from '../../stores/settings.js'
+import { useDomainsStore } from '../../stores/domains.js'
+import { useToolsStore } from '../../stores/tools.js'
 import { useAuthStore } from '../../stores/auth.js'
 import ApiKeys from './ApiKeys.vue'
 import Import from './Import.vue'
@@ -56,7 +57,8 @@ import Export from './Export.vue'
 import { formatDateYMD } from '../../utils/date.js'
 
 const router = useRouter()
-const settingsStore = useSettingsStore()
+const domainsStore = useDomainsStore()
+const toolsStore = useToolsStore()
 const authStore = useAuthStore()
 
 const fileInput = ref(null)
@@ -85,8 +87,8 @@ const setFileInput = el => {
 }
 
 onMounted(async () => {
-	await settingsStore.fetchDomains()
-	await settingsStore.fetchApiKeys()
+	await domainsStore.fetchDomains()
+	await toolsStore.fetchApiKeys()
 	await fetchExportCount()
 })
 
@@ -107,7 +109,7 @@ async function handleCreateApiKey() {
 			.split(',')
 			.map(v => v.trim())
 			.filter(Boolean)
-		const result = await settingsStore.createApiKey({
+		const result = await toolsStore.createApiKey({
 			name,
 			allowed_ips: allowedIps
 		})
@@ -124,7 +126,7 @@ async function handleCreateApiKey() {
 
 async function handleToggleApiKey(key) {
 	try {
-		await settingsStore.updateApiKey(key.id, { enabled: !key.enabled })
+		await toolsStore.updateApiKey(key.id, { enabled: !key.enabled })
 	} catch (err) {
 		alert(err.message)
 	}
@@ -133,7 +135,7 @@ async function handleToggleApiKey(key) {
 async function handleRegenerateApiKey(key) {
 	if (!confirm(`Regenerate API key "${key.name}"? Existing token will stop working immediately.`)) return
 	try {
-		const result = await settingsStore.regenerateApiKey(key.id)
+		const result = await toolsStore.regenerateApiKey(key.id)
 		lastGeneratedApiToken.value = result.token || ''
 		lastGeneratedApiKeyId.value = result.key?.id || key.id
 	} catch (err) {
@@ -144,7 +146,7 @@ async function handleRegenerateApiKey(key) {
 async function handleDeleteApiKey(key) {
 	if (!confirm(`Delete API key "${key.name}"?`)) return
 	try {
-		await settingsStore.deleteApiKey(key.id)
+		await toolsStore.deleteApiKey(key.id)
 		if (lastGeneratedApiKeyId.value === key.id) {
 			lastGeneratedApiToken.value = ''
 			lastGeneratedApiKeyId.value = null
@@ -230,7 +232,7 @@ async function executeImport() {
 		if (fileInput.value) {
 			fileInput.value.value = ''
 		}
-		await settingsStore.fetchDomains()
+		await domainsStore.fetchDomains()
 		router.push('/links')
 	} catch (err) {
 		alert(err.message)

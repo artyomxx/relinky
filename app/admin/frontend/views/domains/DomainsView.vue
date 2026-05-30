@@ -1,8 +1,8 @@
 <template>
 	<div class="domains-view">
 		<DomainsList
-			:loading="settingsStore.loading"
-			:domains="settingsStore.domains"
+			:loading="domainsStore.loading"
+			:domains="domainsStore.domains"
 			:show-add-domain="showAddDomain"
 			:new-domain="newDomain"
 			:show-domain-unsaved-hint="showDomainUnsavedHint"
@@ -17,9 +17,9 @@
 
 		<section class="view-group">
 			<Defaults
-				:loading="settingsStore.loading"
+				:loading="domainsStore.loading"
 				:saving="savingSettings"
-				:domains="settingsStore.domains"
+				:domains="domainsStore.domains"
 				:local-defaults="localDefaults"
 				:local-settings="localSettings"
 				:save-success="saveSuccess"
@@ -32,7 +32,7 @@
 
 		<section class="view-group view-group--danger">
 			<DangerZone
-				:domains="settingsStore.domains"
+				:domains="domainsStore.domains"
 				:danger-zone-domain="dangerZoneDomain"
 				:show-domain-confirm-input="showDomainConfirmInput"
 				:domain-confirm-input="domainConfirmInput"
@@ -50,13 +50,13 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import { useSettingsStore } from '../../stores/settings.js'
+import { useDomainsStore } from '../../stores/domains.js'
 import { useAuthStore } from '../../stores/auth.js'
 import Defaults from './Defaults.vue'
 import DomainsList from './DomainsList.vue'
 import DangerZone from './DangerZone.vue'
 
-const settingsStore = useSettingsStore()
+const domainsStore = useDomainsStore()
 const authStore = useAuthStore()
 const showAddDomain = ref(false)
 const newDomain = ref('')
@@ -189,24 +189,24 @@ function resetSettings() {
 onMounted(async () => {
 	window.addEventListener('keydown', handleEscape)
 
-	await settingsStore.fetchDomains()
-	await settingsStore.fetchSettings()
+	await domainsStore.fetchDomains()
+	await domainsStore.fetchDefaults()
 
-	localSettings.value = { ...settingsStore.settings }
-	originalSettings.value = { ...settingsStore.settings }
+	localSettings.value = { ...domainsStore.settings }
+	originalSettings.value = { ...domainsStore.settings }
 
 	let defaultDomainName = ''
-	if (settingsStore.defaults.default_domain_id) {
-		const domain = settingsStore.domains.find(d => d.id.toString() === settingsStore.defaults.default_domain_id.toString())
+	if (domainsStore.defaults.default_domain_id) {
+		const domain = domainsStore.domains.find(d => d.id.toString() === domainsStore.defaults.default_domain_id.toString())
 		defaultDomainName = domain ? domain.domain : ''
 	}
 
 	const defaults = {
 		default_domain: defaultDomainName,
-		expired_url: settingsStore.defaults.expired_url || '',
-		redirect_code: settingsStore.defaults.redirect_code || '303',
-		keep_referrer: settingsStore.defaults.keep_referrer === 'true' || settingsStore.defaults.keep_referrer === true,
-		keep_query_params: settingsStore.defaults.keep_query_params === 'true' || settingsStore.defaults.keep_query_params === true
+		expired_url: domainsStore.defaults.expired_url || '',
+		redirect_code: domainsStore.defaults.redirect_code || '303',
+		keep_referrer: domainsStore.defaults.keep_referrer === 'true' || domainsStore.defaults.keep_referrer === true,
+		keep_query_params: domainsStore.defaults.keep_query_params === 'true' || domainsStore.defaults.keep_query_params === true
 	}
 
 	localDefaults.value = { ...defaults }
@@ -250,7 +250,7 @@ async function saveSettings() {
 
 		let defaultDomainId = ''
 		if (localDefaults.value.default_domain) {
-			const domain = settingsStore.domains.find(d => d.domain === localDefaults.value.default_domain)
+			const domain = domainsStore.domains.find(d => d.domain === localDefaults.value.default_domain)
 			if (domain) {
 				defaultDomainId = domain.id.toString()
 			}
@@ -264,7 +264,7 @@ async function saveSettings() {
 		}
 		delete defaultsToSave.default_domain
 
-		await settingsStore.updateSettings(localSettings.value, defaultsToSave)
+		await domainsStore.updateDefaults(localSettings.value, defaultsToSave)
 
 		originalSettings.value = { ...localSettings.value }
 		originalDefaults.value = { ...localDefaults.value }
@@ -294,7 +294,7 @@ async function handleAddDomain() {
 	}
 
 	try {
-		await settingsStore.createDomain(domain)
+		await domainsStore.createDomain(domain)
 		newDomain.value = ''
 		domainHintShown.value = false
 		showDomainUnsavedHint.value = false
@@ -352,7 +352,7 @@ async function confirmDeleteDomain() {
 		dangerZoneDomain.value = ''
 		showDomainConfirmInput.value = false
 		domainConfirmInput.value = ''
-		await settingsStore.fetchDomains()
+		await domainsStore.fetchDomains()
 	} catch (err) {
 		alert(err.message)
 	} finally {
