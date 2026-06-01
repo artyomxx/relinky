@@ -21,6 +21,11 @@
 		</section>
 
 		<section class="view-group">
+			<h2 class="view-group-title">Password</h2>
+			<Password :env-managed="passwordEnvManaged" />
+		</section>
+
+		<section class="view-group">
 			<h2 class="view-group-title">Import & export</h2>
 			<div class="import-export-grid">
 				<Import
@@ -52,6 +57,7 @@ import { useDomainsStore } from '../../stores/domains.js'
 import { useToolsStore } from '../../stores/tools.js'
 import { useAuthStore } from '../../stores/auth.js'
 import ApiKeys from './ApiKeys.vue'
+import Password from './Password.vue'
 import Import from './Import.vue'
 import Export from './Export.vue'
 import { formatDateYMD } from '../../utils/date.js'
@@ -81,6 +87,7 @@ const newApiAllowedIps = ref('')
 const creatingApiKey = ref(false)
 const lastGeneratedApiToken = ref('')
 const lastGeneratedApiKeyId = ref(null)
+const passwordEnvManaged = ref(false)
 
 const setFileInput = el => {
 	fileInput.value = el
@@ -90,6 +97,12 @@ onMounted(async () => {
 	await domainsStore.fetchDomains()
 	await toolsStore.fetchApiKeys()
 	await fetchExportCount()
+	try {
+		const source = await authStore.fetchPasswordSource()
+		passwordEnvManaged.value = Boolean(source.envManaged)
+	} catch {
+		passwordEnvManaged.value = false
+	}
 })
 
 function formatTs(value) {

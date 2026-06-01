@@ -2,6 +2,7 @@ import { dbDir } from './db.js'
 import { dbSteps } from './db-schema.js'
 import { runMigrations, getUserVersion } from './migrate.js'
 import { backupDb, pruneBackups, hasExistingSchema, backupKeep } from './db-backup.js'
+import { seedAdminPasswordFromEnv } from './seed-admin-password.js'
 import { mkdir } from 'fs/promises'
 
 // Ensure db directory exists (dbDir is resolved in db.js, honoring RELINKY_DB_DIR)
@@ -27,5 +28,7 @@ for (const [label, getDb, migrations] of dbSteps) {
 		db.close()
 	}
 }
+
+seedAdminPasswordFromEnv()
 
 console.log('Databases initialized successfully')

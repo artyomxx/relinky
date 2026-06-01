@@ -216,6 +216,120 @@ function logAction(db, table, action, itemId, clientInfo, diff = null) {
 
 // Auth endpoints
 export function setupAuthRoutes(router, auth) {
+	router.get('/api/setup/status', (req, res) => {
+		sendJson(res, 200, { initialized: auth.isInitialized() })
+	})
+
+	router.post('/api/setup', async (req, res) => {
+		try {
+			if (auth.isInitialized()) {
+				sendJson(res, 409, { error: 'Already initialized' })
+				return
+			}
+
+			const body = await parseBody(req)
+			const password = typeof body?.password === 'string' ? body.password : ''
+			const domain = typeof body?.domain === 'string' ? body.domain.trim() : ''
+
+			if (password.length < 8) {
+				sendJson(res, 400, { error: 'Password must be at least 8 characters' })
+				return
+			}
+
+			const hash = auth.hashPassword(password)
+			if (!auth.tryClaimAdminPassword(hash)) {
+				sendJson(res, 409, { error: 'Already initialized' })
+				return
+			}
+
+			if (domain) {
+				const redirectablesDb = getRedirectablesDb()
+				let domainId
+				try {
+					const existing = redirectablesDb
+						.prepare('SELECT id FROM domains WHERE domain = ?')
+						.get(domain)
+					if (existing) {
+						domainId = existing.id
+					} else {
+						const result = redirectablesDb
+							.prepare('INSERT INTO domains (domain) VALUES (?)')
+							.run(domain)
+						domainId = result.lastInsertRowid
+					}
+				} finally {
+					redirectablesDb.close()
+				}
+
+				const mainDb = getMainDb()
+				try {
+					mainDb
+						.prepare('INSERT OR REPLACE INTO defaults (key, value) VALUES (?, ?)')
+						.run('default_domain_id', String(domainId))
+				} finally {
+					mainDb.close()
+				}
+
+				setImmediate(() => scheduleGatewayReload())
+			}
+
+			const token = auth.createSession()
+			const clientInfo = getClientInfo(req)
+			const logsDb = getLogsDb()
+			logAction(logsDb, 'main_logs', 'completed setup', null, clientInfo)
+			logsDb.close()
+			sendJson(res, 200, { token })
+		} catch (err) {
+			sendJson(res, 400, { error: err.message || 'Invalid request' })
+		}
+	})
+
+	router.get('/api/auth/password-source', (req, res) => {
+		if (!auth.requireAuth(req)) {
+			sendJson(res, 401, { error: 'Unauthorized' })
+			return
+		}
+		sendJson(res, 200, { envManaged: auth.envPasswordPresent() })
+	})
+
+	router.put('/api/auth/password', async (req, res) => {
+		if (!auth.requireAuth(req)) {
+			sendJson(res, 401, { error: 'Unauthorized' })
+			return
+		}
+
+		try {
+			const body = await parseBody(req)
+			const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : ''
+			const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : ''
+
+			if (newPassword.length < 8) {
+				sendJson(res, 400, { error: 'New password must be at least 8 characters' })
+				return
+			}
+
+			const stored = auth.getDbPasswordHash()
+			if (!stored || !auth.verifyPassword(currentPassword, stored)) {
+				sendJson(res, 403, { error: 'Current password is incorrect' })
+				return
+			}
+
+			auth.setDbPasswordHash(auth.hashPassword(newPassword))
+
+			const clientInfo = getClientInfo(req)
+			const logsDb = getLogsDb()
+			logAction(logsDb, 'main_logs', 'changed password', null, clientInfo)
+			logsDb.close()
+
+			sendJson(res, 200, {
+				success: true,
+				envManaged: auth.envPasswordPresent()
+			})
+		} catch (err) {
+			sendJson(res, 400, { error: err.message || 'Invalid request' })
+		}
+	})
+
 	router.post('/api/auth/login', async (req, res) => {
 		try {
 			const body = await parseBody(req)

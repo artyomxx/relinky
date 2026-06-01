@@ -35,5 +35,16 @@ export default [
 				CREATE INDEX IF NOT EXISTS idx_api_keys_enabled ON api_keys(enabled);
 			`)
 		}
+	},
+	{
+		name: 'auth_table',
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS auth (
+					key TEXT PRIMARY KEY,
+					value TEXT
+				);
+			`)
+		}
 	}
 ]

@@ -4,7 +4,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import Database from 'better-sqlite3'
 import { adminListenHost, devPasswordHash, pathHealthcheck } from './constants.js'
+import { ADMIN_PASSWORD_HASH_KEY } from '../app/shared/seed-admin-password.js'
 
 /** Env keys that must not leak from shell / .env into spawned test servers */
 const BIND_ENV_KEYS = [
@@ -16,6 +18,30 @@ const BIND_ENV_KEYS = [
 	'ADMIN_PASSWORD_HASH_B64',
 	'RELINKY_DB_DIR'
 ]
+
+function scrubBindEnv(env) {
+	const out = { ...env }
+	for (const key of BIND_ENV_KEYS) {
+		delete out[key]
+	}
+	return out
+}
+
+function runInitDb(dir, { passwordHash = devPasswordHash } = {}) {
+	const env = scrubBindEnv(process.env)
+	env.RELINKY_DB_DIR = dir
+	if (passwordHash) {
+		env.ADMIN_PASSWORD_HASH = passwordHash
+	}
+	const result = spawnSync('node', ['app/shared/init-db.js'], {
+		cwd: process.cwd(),
+		env,
+		encoding: 'utf8'
+	})
+	if (result.status !== 0) {
+		throw new Error(`test db init failed (exit ${result.status}):\n${result.stderr}`)
+	}
+}
 
 /**
  * One isolated database directory per test-file process so the suite never touches the
@@ -29,15 +55,27 @@ process.on('exit', () => {
 	} catch {}
 })
 
-// Services verify the schema on boot but no longer migrate themselves, so run the
-// migrator once (per test-file process) against this dir before any server is spawned.
-const migrate = spawnSync('node', ['app/shared/init-db.js'], {
-	cwd: process.cwd(),
-	env: { ...process.env, RELINKY_DB_DIR: testDbDir },
-	encoding: 'utf8'
-})
-if (migrate.status !== 0) {
-	throw new Error(`test db init failed (exit ${migrate.status}):\n${migrate.stderr}`)
+// Services verify the schema on boot but no longer migrate themselves. The migrator seeds
+// the dev password hash into auth so login checks the DB.
+runInitDb(testDbDir)
+
+export { testDbDir }
+
+/** Fresh dir with schema but no admin password (for onboarding tests). Caller must rmSync. */
+export function createUninitializedTestDb() {
+	const dir = mkdtempSync(join(tmpdir(), 'relinky-test-uninit-'))
+	runInitDb(dir, { passwordHash: null })
+	return dir
+}
+
+export function readAdminPasswordHash(dir) {
+	const db = new Database(join(dir, 'main.db'))
+	try {
+		const row = db.prepare('SELECT value FROM auth WHERE key = ?').get(ADMIN_PASSWORD_HASH_KEY)
+		return row?.value || null
+	} finally {
+		db.close()
+	}
 }
 
 /**
@@ -87,23 +125,23 @@ export async function allocRedirectorPort() {
 
 /** Drop dev .env / shell bind vars so spawned servers only use test overrides. */
 export function buildTestEnv(overrides = {}) {
-	const env = { ...process.env }
-	for (const key of BIND_ENV_KEYS) {
-		delete env[key]
-	}
-	return { ...env, RELINKY_DB_DIR: testDbDir, ...overrides }
+	return { ...scrubBindEnv(process.env), RELINKY_DB_DIR: testDbDir, ...overrides }
 }
 
-export function buildAdminTestEnv(port) {
-	return buildTestEnv({
+/** Build env for a server using an alternate db directory (e.g. uninitialized onboarding dir). */
+export function buildTestEnvForDb(dir, overrides = {}) {
+	return { ...scrubBindEnv(process.env), RELINKY_DB_DIR: dir, ...overrides }
+}
+
+export function buildAdminTestEnv(port, dbDir = testDbDir) {
+	return buildTestEnvForDb(dbDir, {
 		ADMIN_IP: adminListenHost,
-		ADMIN_PORT: String(port),
-		ADMIN_PASSWORD_HASH: devPasswordHash
+		ADMIN_PORT: String(port)
 	})
 }
 
-export function buildRedirectorTestEnv(port) {
-	return buildTestEnv({
+export function buildRedirectorTestEnv(port, dbDir = testDbDir) {
+	return buildTestEnvForDb(dbDir, {
 		REDIRECTOR_IP: adminListenHost,
 		REDIRECTOR_PORT: String(port)
 	})

@@ -1,68 +1,20 @@
 import { timingSafeEqual, randomBytes, randomUUID, scryptSync } from 'crypto'
 import { sha512 } from 'sha512-crypt-ts'
+import { getMainDb } from '../../shared/db.js'
+import { ADMIN_PASSWORD_HASH_KEY, envPasswordPresent } from '../../shared/seed-admin-password.js'
 
 // In-memory session store
 const sessions = new Map()
 
 const sha512Rounds = parseInt(process.env.ADMIN_PASSWORD_SHA512_ROUNDS || '5000', 10)
 
-/**
- * Coolify and some hosts corrupt `$` in environment values (even "Literal").
- * Use ADMIN_PASSWORD_HASH_B64 (base64 of the utf8 `$6$…` string) when raw hash fails.
- */
-function resolvePasswordHash() {
-	const b64Only = process.env.ADMIN_PASSWORD_HASH_B64?.trim()
-	if (b64Only) {
-		try {
-			const s = Buffer.from(b64Only, 'base64').toString('utf8').trim()
-			return s || null
-		} catch {
-			return null
-		}
-	}
-	const raw = process.env.ADMIN_PASSWORD_HASH?.trim()
-	return raw || null
-}
-
-const passwordHash = resolvePasswordHash()
-
-/** When true, log failed login attempts (never the password) and hash presence at startup. */
+/** When true, log failed login attempts (never the password). */
 export function isAdminLoginDebug() {
 	const v = process.env.ADMIN_LOGIN_DEBUG
 	return v === '1' || v === 'true' || v === 'yes'
 }
 
-if (isAdminLoginDebug()) {
-	let src = '(none)'
-	if (process.env.ADMIN_PASSWORD_HASH_B64?.trim()) {
-		src = 'ADMIN_PASSWORD_HASH_B64'
-	} else if (process.env.ADMIN_PASSWORD_HASH?.trim()) {
-		src = 'ADMIN_PASSWORD_HASH'
-	}
-	if (passwordHash) {
-		console.log(
-			'[Auth] DEBUG: hash from %s, length=%d, startsWith$6$=%s',
-			src,
-			passwordHash.length,
-			String(passwordHash.startsWith('$6$'))
-		)
-	} else {
-		console.log('[Auth] DEBUG: no resolved hash (set ADMIN_PASSWORD_HASH or ADMIN_PASSWORD_HASH_B64)')
-	}
-}
-
-if (!passwordHash) {
-	console.warn(
-		'[Auth] WARNING: Set ADMIN_PASSWORD_HASH or ADMIN_PASSWORD_HASH_B64 (base64 of the $6$ hash). ' +
-			'Admin login will not work.'
-	)
-} else if (!passwordHash.startsWith('$6$')) {
-	console.warn(
-		'[Auth] Resolved password hash does not start with $6$ (sha512-crypt). ' +
-			'If you use Coolify, set ADMIN_PASSWORD_HASH_B64 to the base64 of your hash ' +
-			'(see npm run hash-password -- --b64 or readme).'
-	)
-}
+export { envPasswordPresent }
 
 const cryptAlphabet = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 const apiKeyPrefix = 'rk_'
@@ -73,6 +25,53 @@ function randomSaltSpec() {
 		salt += cryptAlphabet[b % 64]
 	}
 	return `$6$rounds=${sha512Rounds}$${salt}`
+}
+
+export function getDbPasswordHash() {
+	const db = getMainDb()
+	try {
+		const row = db.prepare('SELECT value FROM auth WHERE key = ?').get(ADMIN_PASSWORD_HASH_KEY)
+		return row?.value || null
+	} finally {
+		db.close()
+	}
+}
+
+export function setDbPasswordHash(hash) {
+	const db = getMainDb()
+	try {
+		db.prepare('INSERT OR REPLACE INTO auth (key, value) VALUES (?, ?)').run(
+			ADMIN_PASSWORD_HASH_KEY,
+			hash
+		)
+	} finally {
+		db.close()
+	}
+}
+
+/** True when auth.admin_password_hash exists in the DB (login and onboarding gate). */
+export function isInitialized() {
+	return Boolean(getDbPasswordHash())
+}
+
+/**
+ * First-visitor-wins: insert hash only if none exists. Returns true if this call claimed setup.
+ */
+export function tryClaimAdminPassword(hash) {
+	const db = getMainDb()
+	try {
+		const claim = db.transaction(() => {
+			const row = db.prepare('SELECT value FROM auth WHERE key = ?').get(ADMIN_PASSWORD_HASH_KEY)
+			if (row?.value) {
+				return false
+			}
+			db.prepare('INSERT INTO auth (key, value) VALUES (?, ?)').run(ADMIN_PASSWORD_HASH_KEY, hash)
+			return true
+		})
+		return claim.immediate()
+	} finally {
+		db.close()
+	}
 }
 
 /**
@@ -122,11 +121,12 @@ export function deleteSession(token) {
 }
 
 export function login(password) {
-	if (!passwordHash) {
-		return { success: false, error: 'Admin password not configured' }
+	const stored = getDbPasswordHash()
+	if (!stored) {
+		return { success: false, error: 'Admin not initialized' }
 	}
 
-	if (verifyPassword(password, passwordHash)) {
+	if (verifyPassword(password, stored)) {
 		const token = createSession()
 		return { success: true, token }
 	}
