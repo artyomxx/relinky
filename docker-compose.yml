@@ -20,7 +20,7 @@ services:
     environment:
       # Set in project .env (single-quoted $6$ hash) or in Coolify / CI env — not unquoted in .env
       # or Compose will corrupt the hash. Coolify does not use your repo .env unless you add it.
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
       - ADMIN_IP=${ADMIN_IP:-0.0.0.0}
       - ADMIN_PORT=${ADMIN_PORT:-8081}
       - REDIRECTOR_IP=${REDIRECTOR_IP:-0.0.0.0}

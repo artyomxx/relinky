@@ -563,6 +563,43 @@ a.link-small {
 	color: var(--text-primary);
 }
 
+/* Login, onboarding, and similar screens outside the dashboard chrome */
+.gate-view {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+}
+
+.gate-panel {
+	background: var(--bg-secondary);
+	padding: 2rem;
+	border-radius: 8px;
+	width: 100%;
+	max-width: 400px;
+}
+
+.gate-panel h1 {
+	margin: 0 0 1rem;
+	text-align: center;
+}
+
+.gate-panel hr {
+	margin: 0 0 1rem;
+	border: none;
+	border-top: 1px solid var(--bg-border);
+}
+
+.gate-panel form {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.gate-panel input {
+	width: 100%;
+}
+
 /* Global utility classes */
 .empty {
 	text-align: center;

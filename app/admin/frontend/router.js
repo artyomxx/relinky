@@ -7,8 +7,14 @@ import DomainsView from './views/domains/DomainsView.vue'
 import ToolsView from './views/tools/ToolsView.vue'
 import LogsView from './views/LogsView.vue'
 import AuthView from './views/AuthView.vue'
+import OnboardingView from './views/OnboardingView.vue'
 
 const routes = [
+	{
+		path: '/onboarding',
+		name: 'onboarding',
+		component: OnboardingView
+	},
 	{
 		path: '/login',
 		name: 'login',
@@ -102,6 +108,27 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
 	const authStore = useAuthStore()
+
+	try {
+		await authStore.ensureSetupStatus()
+	} catch {
+		next()
+		return
+	}
+
+	if (to.path === '/onboarding') {
+		if (authStore.initialized) {
+			next(authStore.isAuthenticated ? '/links' : '/login')
+		} else {
+			next()
+		}
+		return
+	}
+
+	if (!authStore.initialized) {
+		next('/onboarding')
+		return
+	}
 
 	if (authStore.token && (!authStore.hasValidatedToken || to.path !== '/login')) {
 		await authStore.validateToken()

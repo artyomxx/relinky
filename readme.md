@@ -147,23 +147,26 @@ Script pointers for this flow:
 
 Required environment variables:
 
-- `ADMIN_PASSWORD_HASH` (or `ADMIN_PASSWORD_HASH_B64`)
 - `RELINKY_ADMIN_HOST` (required)
 - `ACME_EMAIL` (recommended for real HTTPS)
+
+Optional:
+
+- `ADMIN_PASSWORD_HASH` or `ADMIN_PASSWORD_HASH_B64` — if set, seeded into the DB on startup instead of using onboarding.
 
 Start:
 
 ```bash
-export ADMIN_PASSWORD_HASH='<sha512-crypt-hash>'
 export RELINKY_ADMIN_HOST='admin.example.com'
 export ACME_EMAIL='you@example.com'
+# optional: export ADMIN_PASSWORD_HASH='...'
 docker compose -f docker-compose.gateway.yml up -d
 ```
 
 After startup:
 
 1. Open `https://admin.example.com`
-2. Log in
+2. Complete onboarding (first visit) or log in if a password was seeded
 3. Add redirect domains in **Domains**
 4. Ensure those domains resolve to the same server
 5. Relinky regenerates Caddy config and reloads Caddy automatically
@@ -205,7 +208,7 @@ Checklist:
 
 1. Create an app from a public Github repo or your private cloned one
 2. Build pack: Docker Compose, file [`docker-compose.coolify.yml`](./docker-compose.coolify.yml). Note that by default Coolify offers `.yaml` extension, so change the whole file name.
-3. Provide `ADMIN_PASSWORD_HASH_B64` — Base64-encoded hash. `ADMIN_PASSWORD_HASH` doesn't work with current version of Coolify because `$` symbols are mangld in Coolify's environment variables.
+3. Optional: set `ADMIN_PASSWORD_HASH_B64` on the **relinky_migrate** service (Base64-encoded hash). Coolify often mangles `$` in env vars — use B64 if login fails after deploy. If unset, complete onboarding on first admin visit instead.
 4. Ensure the persistent storage for `./db` is attached to both services (should happen automatically)
 5. Setup admin and redirect domains in Coolify and the admin UI:
    - Admin service: one admin hostname, for example `https://admin.example.com:8081`
@@ -217,7 +220,9 @@ Checklist:
 
 ## Authentication Setup
 
-Generate admin hash:
+On first visit, if no admin password exists in the database, Relinky shows an **onboarding** screen where you set a password and your first redirect domain. After that, use the normal login page.
+
+You can also pre-set a password before first visit:
 
 ```bash
 npm run hash-password -- 'your-password'
@@ -235,7 +240,9 @@ If your platform mangles `$` values:
 npm run hash-password -- 'your-password' --b64
 ```
 
-Then set `ADMIN_PASSWORD_HASH_B64` instead of raw hash.
+Then set `ADMIN_PASSWORD_HASH` or `ADMIN_PASSWORD_HASH_B64`. On every startup the migrator **copies this hash into the database** (overwriting any in-app password change). Remove the env var to manage the password only from the admin UI (**Tools → Password**).
+
+If neither env nor onboarding has run yet, the admin UI stays on onboarding until a password is set.
 
 ---
 
@@ -287,13 +294,10 @@ Check [`.env.example`](./.env.example) file
 
 ### Common (all modes)
 
-Required:
+Optional (seeds the DB password on every migrator run; omit to use onboarding or **Tools → Password**):
 
-- `ADMIN_PASSWORD_HASH` — Raw sha512-crypt admin password hash (`$6$...`) used for admin login.
-
-Alternative to required hash:
-
-- `ADMIN_PASSWORD_HASH_B64` — Base64 form of the same hash, use this one if your platform mangles `$` characters (e.g. Coolify).
+- `ADMIN_PASSWORD_HASH` — Raw sha512-crypt admin password hash (`$6$...`). Copied into the `auth` table on startup (overwrites). Login always checks the database, not env directly.
+- `ADMIN_PASSWORD_HASH_B64` — Base64 form of the same hash; use when your platform mangles `$` characters (e.g. Coolify).
 
 Optional:
 
@@ -341,12 +345,13 @@ Required:
 
 ```bash
 npm install
+cp .env.example .env
 npm run build
-npm start
+npm run dev
 npm run test:spec
 ```
 
-`npm run dev` uses a fixed development hash where password is `dev`.
+`npm run dev` runs migrations/seed once (`dev:prepare`), then watches `app/admin/backend/server.js` and `app/redirector/server.js` (plus Vite). Do **not** watch `start-dev.js` / `start.js` — Node's supervisor + `--watch` + spawned children loops on macOS. `dev:backend` (no watch) still uses `start-dev.js` if you only need the API processes. Loads [`.env`](./.env) via `--env-file-if-exists`. For normal local work, uncomment the dev `ADMIN_PASSWORD_HASH` in `.env` (password `dev`). To test onboarding, leave it unset and start with an empty `db/` directory.
 
 ### Database migrations
 

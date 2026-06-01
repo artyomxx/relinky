@@ -25,6 +25,11 @@ services:
         required: false
     volumes:
       - ./db:/app/db
+    environment:
+      # Seeded into auth table on every migrator run (overwrites). Coolify can mangle `$`;
+      # use ADMIN_PASSWORD_HASH_B64 if startsWith$6$=false in logs.
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
+      - ADMIN_PASSWORD_HASH_B64=${ADMIN_PASSWORD_HASH_B64:-}
     entrypoint: ["node", "/app/app/shared/init-db.js"]
     restart: "no"
 
@@ -39,10 +44,6 @@ services:
       relinky_migrate:
         condition: service_completed_successfully
     environment:
-      # Set ADMIN_PASSWORD_HASH ($6$…) and/or ADMIN_PASSWORD_HASH_B64 (base64 of that string).
-      # Coolify can mangle `$` in “Literal” vars; use B64 only if logs show startsWith$6$=false.
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
-      - ADMIN_PASSWORD_HASH_B64=${ADMIN_PASSWORD_HASH_B64:-}
       # Optional: ADMIN_LOGIN_DEBUG=1 in Coolify env — see readme “Configuration”
       - ADMIN_IP=0.0.0.0
       - ADMIN_PORT=8081

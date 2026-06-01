@@ -34,7 +34,7 @@ services:
       - ./db:/app/db
     environment:
       # Same as docker-compose.yml: set in .env (single-quoted) or host/Coolify env (paste full $6$…).
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
       - RELINKY_USE_GATEWAY=1
       - RELINKY_ADMIN_HOST=${RELINKY_ADMIN_HOST}
       - ACME_EMAIL=${ACME_EMAIL:-}
