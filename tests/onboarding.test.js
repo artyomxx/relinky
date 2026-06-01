@@ -101,6 +101,26 @@ test('setup status reports uninitialized', async () => {
 	assert.equal(res.data?.initialized, false)
 })
 
+test('POST /api/setup without domain returns 400', async () => {
+	const res = await req(pathSetup, {
+		method: 'POST',
+		body: { password: 'setup-pass-123' }
+	})
+	assert.equal(res.status, 400)
+	assert.equal(res.data?.error, 'Domain is required')
+	assert.equal(readAdminPasswordHash(uninitDir), null)
+})
+
+test('POST /api/setup rejects invalid domain', async () => {
+	const res = await req(pathSetup, {
+		method: 'POST',
+		body: { password: 'setup-pass-123', domain: 'localhost' }
+	})
+	assert.equal(res.status, 400)
+	assert.match(res.data?.error, /valid domain/i)
+	assert.equal(readAdminPasswordHash(uninitDir), null)
+})
+
 test('POST /api/setup creates password and returns token', async () => {
 	const setupPassword = 'setup-pass-123'
 	const setupDomain = 'onboard.example.com'
@@ -136,7 +156,7 @@ test('POST /api/setup creates password and returns token', async () => {
 test('second POST /api/setup returns 409 (first visitor wins)', async () => {
 	const res = await req(pathSetup, {
 		method: 'POST',
-		body: { password: 'another-pass-123' }
+		body: { password: 'another-pass-123', domain: 'other.example.com' }
 	})
 	assert.equal(res.status, 409)
 })

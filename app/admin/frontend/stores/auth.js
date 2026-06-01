@@ -59,10 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
 	}
 
 	async function setup(password, domain) {
-		const body = { password }
-		if (domain?.trim()) {
-			body.domain = domain.trim()
-		}
+		const body = { password, domain: domain.trim() }
 		const response = await fetch('/api/setup', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },

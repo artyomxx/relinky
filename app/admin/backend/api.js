@@ -215,6 +215,26 @@ function logAction(db, table, action, itemId, clientInfo, diff = null) {
 }
 
 // Auth endpoints
+/** Same rules as onboarding UI (hostname only, no scheme/path). */
+const SETUP_DOMAIN_RE =
+	/^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/
+
+function validateSetupDomain(domain) {
+	if (!domain) {
+		return 'Domain is required'
+	}
+	if (/:\/\//.test(domain) || domain.includes('/')) {
+		return 'Use the domain only — no https:// or path'
+	}
+	if (/\s/.test(domain)) {
+		return 'Domain cannot contain spaces'
+	}
+	if (!SETUP_DOMAIN_RE.test(domain)) {
+		return 'Enter a valid domain (e.g. example.com)'
+	}
+	return null
+}
+
 export function setupAuthRoutes(router, auth) {
 	router.get('/api/setup/status', (req, res) => {
 		sendJson(res, 200, { initialized: auth.isInitialized() })
@@ -236,42 +256,46 @@ export function setupAuthRoutes(router, auth) {
 				return
 			}
 
+			const domainError = validateSetupDomain(domain)
+			if (domainError) {
+				sendJson(res, 400, { error: domainError })
+				return
+			}
+
 			const hash = auth.hashPassword(password)
 			if (!auth.tryClaimAdminPassword(hash)) {
 				sendJson(res, 409, { error: 'Already initialized' })
 				return
 			}
 
-			if (domain) {
-				const redirectablesDb = getRedirectablesDb()
-				let domainId
-				try {
-					const existing = redirectablesDb
-						.prepare('SELECT id FROM domains WHERE domain = ?')
-						.get(domain)
-					if (existing) {
-						domainId = existing.id
-					} else {
-						const result = redirectablesDb
-							.prepare('INSERT INTO domains (domain) VALUES (?)')
-							.run(domain)
-						domainId = result.lastInsertRowid
-					}
-				} finally {
-					redirectablesDb.close()
+			const redirectablesDb = getRedirectablesDb()
+			let domainId
+			try {
+				const existing = redirectablesDb
+					.prepare('SELECT id FROM domains WHERE domain = ?')
+					.get(domain)
+				if (existing) {
+					domainId = existing.id
+				} else {
+					const result = redirectablesDb
+						.prepare('INSERT INTO domains (domain) VALUES (?)')
+						.run(domain)
+					domainId = result.lastInsertRowid
 				}
-
-				const mainDb = getMainDb()
-				try {
-					mainDb
-						.prepare('INSERT OR REPLACE INTO defaults (key, value) VALUES (?, ?)')
-						.run('default_domain_id', String(domainId))
-				} finally {
-					mainDb.close()
-				}
-
-				setImmediate(() => scheduleGatewayReload())
+			} finally {
+				redirectablesDb.close()
 			}
+
+			const mainDb = getMainDb()
+			try {
+				mainDb
+					.prepare('INSERT OR REPLACE INTO defaults (key, value) VALUES (?, ?)')
+					.run('default_domain_id', String(domainId))
+			} finally {
+				mainDb.close()
+			}
+
+			setImmediate(() => scheduleGatewayReload())
 
 			const token = auth.createSession()
 			const clientInfo = getClientInfo(req)

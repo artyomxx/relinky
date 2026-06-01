@@ -220,7 +220,7 @@ Checklist:
 
 ## Authentication Setup
 
-On first visit, if no admin password exists in the database, Relinky shows an **onboarding** screen where you set a password (and optionally add your first redirect domain). After that, use the normal login page.
+On first visit, if no admin password exists in the database, Relinky shows an **onboarding** screen where you set a password and your first redirect domain. After that, use the normal login page.
 
 You can also pre-set a password before first visit:
 
