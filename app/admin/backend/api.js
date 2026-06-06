@@ -1,4 +1,5 @@
 import { getRedirectablesDb, getStatsDb, getLogsDb, getMainDb } from '../../shared/db.js'
+import { resolveExpiredUrlId } from '../../shared/expired-url-db.js'
 import { scheduleGatewayReload } from '../../shared/gateway-reload.js'
 import UAParser from 'ua-parser-js'
 import { BlockList, isIP } from 'net'
@@ -23,6 +24,75 @@ function parseBody(req) {
 		})
 		req.on('error', reject)
 	})
+}
+
+const DOMAIN_OVERRIDE_KEYS = [
+	'expired_url',
+	'redirect_code',
+	'keep_referrer',
+	'keep_query_params',
+	'error_404_url',
+	'error_500_url'
+]
+
+function formatNullableBoolColumn(value) {
+	if (value === null || value === undefined) {
+		return null
+	}
+	return value === 1
+}
+
+function formatLinkForApi(link) {
+	return {
+		id: link.id,
+		domain_id: link.domain_id,
+		domain: link.domain,
+		slug: link.slug,
+		url: link.url,
+		expired_url: link.expired_url,
+		keep_referrer: formatNullableBoolColumn(link.keep_referrer),
+		keep_query_params: formatNullableBoolColumn(link.keep_query_params),
+		redirect_code: link.redirect_code === null || link.redirect_code === undefined
+			? null
+			: link.redirect_code,
+		created: link.created,
+		changed: link.changed,
+		expire: link.expire,
+		comment: link.comment,
+		click_count: link.click_count
+	}
+}
+
+function sqlNullableBoolFromBody(value) {
+	if (value === null) {
+		return null
+	}
+	if (value === undefined) {
+		return undefined
+	}
+	return value ? 1 : 0
+}
+
+function sqlRedirectCodeFromBody(value) {
+	if (value === null) {
+		return null
+	}
+	if (value === undefined) {
+		return undefined
+	}
+	const n = parseInt(value, 10)
+	return Number.isNaN(n) ? null : n
+}
+
+function domainOverridesFromRow(row) {
+	return {
+		expired_url: row.expired_url || null,
+		redirect_code: row.redirect_code ?? null,
+		keep_referrer: formatNullableBoolColumn(row.keep_referrer),
+		keep_query_params: formatNullableBoolColumn(row.keep_query_params),
+		error_404_url: row.error_404_url || null,
+		error_500_url: row.error_500_url || null
+	}
 }
 
 function getClientInfo(req) {
@@ -581,20 +651,8 @@ export function setupLinkRoutes(router, auth) {
 		statsDb.close()
 
 		sendJson(res, 200, {
-			links: links.map(link => ({
-				id: link.id,
-				domain_id: link.domain_id,
-				domain: link.domain,
-				slug: link.slug,
-				url: link.url,
-				expired_url: link.expired_url,
-				keep_referrer: link.keep_referrer === 1,
-				keep_query_params: link.keep_query_params === 1,
-				redirect_code: link.redirect_code,
-				created: link.created,
-				changed: link.changed,
-				expire: link.expire,
-				comment: link.comment,
+			links: links.map(link => formatLinkForApi({
+				...link,
 				click_count: clickCounts.get(link.id) || 0
 			})),
 			pagination: {
@@ -679,14 +737,18 @@ export function setupLinkRoutes(router, auth) {
 						created, changed, expire, comment
 					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				`)
+				const keepReferrer = sqlNullableBoolFromBody(data.keep_referrer)
+				const keepQueryParams = sqlNullableBoolFromBody(data.keep_query_params)
+				const redirectCode = sqlRedirectCodeFromBody(data.redirect_code)
+
 				const result = insertLink.run(
 					domainId,
 					data.slug,
 					urlId,
 					expiredUrlId,
-					data.keep_referrer ? 1 : 0,
-					data.keep_query_params ? 1 : 0,
-					data.redirect_code || 303,
+					keepReferrer === undefined ? null : keepReferrer,
+					keepQueryParams === undefined ? null : keepQueryParams,
+					redirectCode === undefined ? null : redirectCode,
 					now,
 					now,
 					data.expire || null,
@@ -868,28 +930,38 @@ export function setupLinkRoutes(router, auth) {
 					updateExpiredUrlId.run(expiredUrlId, data.id)
 				}
 
-				// Update other fields
-				const updateStmt = db.prepare(`
-					UPDATE links SET
-						slug = COALESCE(?, slug),
-						keep_referrer = COALESCE(?, keep_referrer),
-						keep_query_params = COALESCE(?, keep_query_params),
-						redirect_code = COALESCE(?, redirect_code),
-						changed = ?,
-						expire = ?,
-						comment = COALESCE(?, comment)
-					WHERE id = ?
-				`)
-				updateStmt.run(
-					data.slug || null,
-					data.keep_referrer !== undefined ? (data.keep_referrer ? 1 : 0) : null,
-					data.keep_query_params !== undefined ? (data.keep_query_params ? 1 : 0) : null,
-					data.redirect_code || null,
-					Date.now(),
-					data.expire || null,
-					data.comment || null,
-					data.id
-				)
+				const linkSets = []
+				const linkParams = []
+				if (data.slug !== undefined && data.slug !== null) {
+					linkSets.push('slug = ?')
+					linkParams.push(data.slug)
+				}
+				if (data.keep_referrer !== undefined) {
+					linkSets.push('keep_referrer = ?')
+					linkParams.push(sqlNullableBoolFromBody(data.keep_referrer))
+				}
+				if (data.keep_query_params !== undefined) {
+					linkSets.push('keep_query_params = ?')
+					linkParams.push(sqlNullableBoolFromBody(data.keep_query_params))
+				}
+				if (data.redirect_code !== undefined) {
+					linkSets.push('redirect_code = ?')
+					linkParams.push(sqlRedirectCodeFromBody(data.redirect_code))
+				}
+				linkSets.push('changed = ?')
+				linkParams.push(Date.now())
+				if (data.expire !== undefined) {
+					linkSets.push('expire = ?')
+					linkParams.push(data.expire || null)
+				}
+				if (data.comment !== undefined) {
+					linkSets.push('comment = ?')
+					linkParams.push(data.comment || null)
+				}
+				linkParams.push(data.id)
+				if (linkSets.length > 1) {
+					db.prepare(`UPDATE links SET ${linkSets.join(', ')} WHERE id = ?`).run(...linkParams)
+				}
 				
 				// Fetch updated link to get final values for diff
 				const updatedLinkStmt = db.prepare(`
@@ -1593,21 +1665,7 @@ export function setupLinkRoutes(router, auth) {
 			return
 		}
 
-		sendJson(res, 200, {
-			id: link.id,
-			domain_id: link.domain_id,
-			domain: link.domain,
-			slug: link.slug,
-			url: link.url,
-			expired_url: link.expired_url,
-			keep_referrer: link.keep_referrer === 1,
-			keep_query_params: link.keep_query_params === 1,
-			redirect_code: link.redirect_code,
-			created: link.created,
-			changed: link.changed,
-			expire: link.expire,
-			comment: link.comment
-		})
+		sendJson(res, 200, formatLinkForApi(link))
 	})
 }
 
@@ -1853,6 +1911,163 @@ export function setupDomainRoutes(router, auth) {
 		sendJson(res, 200, { domains })
 	})
 
+	router.get('/api/domains/:id', (req, res, params) => {
+		if (!auth.requireAuth(req)) {
+			sendJson(res, 401, { error: 'Unauthorized' })
+			return
+		}
+
+		const db = getRedirectablesDb()
+		const row = db.prepare(`
+			SELECT
+				d.id,
+				d.domain,
+				d.redirect_code,
+				d.keep_referrer,
+				d.keep_query_params,
+				d.error_404_url,
+				d.error_500_url,
+				eu.url AS expired_url
+			FROM domains d
+			LEFT JOIN expired_urls eu ON d.expired_url_id = eu.id
+			WHERE d.id = ?
+		`).get(params.id)
+		db.close()
+
+		if (!row) {
+			sendJson(res, 404, { error: 'Domain not found' })
+			return
+		}
+
+		sendJson(res, 200, {
+			id: row.id,
+			domain: row.domain,
+			overrides: domainOverridesFromRow(row)
+		})
+	})
+
+	router.put('/api/domains/:id', async (req, res, params) => {
+		if (!auth.requireAuth(req)) {
+			sendJson(res, 401, { error: 'Unauthorized' })
+			return
+		}
+
+		try {
+			const body = await parseBody(req)
+			const clientInfo = getClientInfo(req)
+			const db = getRedirectablesDb()
+
+			const existing = db.prepare(`
+				SELECT
+					d.id,
+					d.domain,
+					d.expired_url_id,
+					d.redirect_code,
+					d.keep_referrer,
+					d.keep_query_params,
+					d.error_404_url,
+					d.error_500_url,
+					eu.url AS expired_url
+				FROM domains d
+				LEFT JOIN expired_urls eu ON d.expired_url_id = eu.id
+				WHERE d.id = ?
+			`).get(params.id)
+
+			if (!existing) {
+				db.close()
+				sendJson(res, 404, { error: 'Domain not found' })
+				return
+			}
+
+			const beforeOverrides = domainOverridesFromRow(existing)
+			const updates = {}
+			for (const key of DOMAIN_OVERRIDE_KEYS) {
+				if (Object.prototype.hasOwnProperty.call(body, key)) {
+					updates[key] = body[key]
+				}
+			}
+
+			if (Object.keys(updates).length === 0) {
+				db.close()
+				sendJson(res, 400, { error: 'No override fields provided' })
+				return
+			}
+
+			const sets = []
+			const values = []
+
+			if (Object.prototype.hasOwnProperty.call(updates, 'expired_url')) {
+				const expiredUrlId = resolveExpiredUrlId(db, updates.expired_url)
+				sets.push('expired_url_id = ?')
+				values.push(expiredUrlId)
+			}
+			if (Object.prototype.hasOwnProperty.call(updates, 'redirect_code')) {
+				sets.push('redirect_code = ?')
+				values.push(sqlRedirectCodeFromBody(updates.redirect_code))
+			}
+			if (Object.prototype.hasOwnProperty.call(updates, 'keep_referrer')) {
+				sets.push('keep_referrer = ?')
+				values.push(sqlNullableBoolFromBody(updates.keep_referrer))
+			}
+			if (Object.prototype.hasOwnProperty.call(updates, 'keep_query_params')) {
+				sets.push('keep_query_params = ?')
+				values.push(sqlNullableBoolFromBody(updates.keep_query_params))
+			}
+			if (Object.prototype.hasOwnProperty.call(updates, 'error_404_url')) {
+				const v = typeof updates.error_404_url === 'string' ? updates.error_404_url.trim() : ''
+				sets.push('error_404_url = ?')
+				values.push(v || null)
+			}
+			if (Object.prototype.hasOwnProperty.call(updates, 'error_500_url')) {
+				const v = typeof updates.error_500_url === 'string' ? updates.error_500_url.trim() : ''
+				sets.push('error_500_url = ?')
+				values.push(v || null)
+			}
+
+			values.push(params.id)
+			db.prepare(`UPDATE domains SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+
+			const updated = db.prepare(`
+				SELECT
+					d.id,
+					d.domain,
+					d.redirect_code,
+					d.keep_referrer,
+					d.keep_query_params,
+					d.error_404_url,
+					d.error_500_url,
+					eu.url AS expired_url
+				FROM domains d
+				LEFT JOIN expired_urls eu ON d.expired_url_id = eu.id
+				WHERE d.id = ?
+			`).get(params.id)
+			db.close()
+
+			const afterOverrides = domainOverridesFromRow(updated)
+			const diffLabels = {
+				expired_url: 'Expired URL',
+				redirect_code: 'Redirect Code',
+				keep_referrer: 'Keep Referrer',
+				keep_query_params: 'Keep Query Params',
+				error_404_url: '404 Redirect URL',
+				error_500_url: '500 Redirect URL'
+			}
+			const domainDiff = calculateDiff(beforeOverrides, afterOverrides, diffLabels)
+
+			const logsDb = getLogsDb()
+			logAction(logsDb, 'domain_logs', 'updated settings', params.id, clientInfo, domainDiff)
+			logsDb.close()
+
+			sendJson(res, 200, {
+				id: updated.id,
+				domain: updated.domain,
+				overrides: afterOverrides
+			})
+		} catch (err) {
+			sendJson(res, 400, { error: err.message || 'Invalid request' })
+		}
+	})
+
 	router.post('/api/domains', async (req, res) => {
 		if (!auth.requireAuth(req)) {
 			sendJson(res, 401, { error: 'Unauthorized' })
@@ -1898,58 +2113,6 @@ export function setupDomainRoutes(router, auth) {
 		} catch (err) {
 			sendJson(res, 400, { error: err.message || 'Invalid request' })
 		}
-	})
-
-	router.delete('/api/domains/:id', (req, res, params) => {
-		if (!auth.requireAuth(req)) {
-			sendJson(res, 401, { error: 'Unauthorized' })
-			return
-		}
-
-		const clientInfo = getClientInfo(req)
-		const db = getRedirectablesDb()
-
-		// Check if domain is used by any links
-		const linksStmt = db.prepare('SELECT COUNT(*) as count FROM links WHERE domain_id = ?')
-		const linksCount = linksStmt.get(params.id).count
-
-		if (linksCount > 0) {
-			db.close()
-			sendJson(res, 400, { error: `Cannot delete domain: ${linksCount} link(s) are using it` })
-			return
-		}
-
-		// Fetch domain data before deletion for logging
-		const domainStmt = db.prepare('SELECT domain FROM domains WHERE id = ?')
-		const domain = domainStmt.get(params.id)
-		
-		if (!domain) {
-			db.close()
-			sendJson(res, 404, { error: 'Domain not found' })
-			return
-		}
-
-		const deleteStmt = db.prepare('DELETE FROM domains WHERE id = ?')
-		const result = deleteStmt.run(params.id)
-		db.close()
-
-		if (result.changes === 0) {
-			sendJson(res, 404, { error: 'Domain not found' })
-			return
-		}
-
-		// Log action with deletion info
-		const domainDiff = [{
-			what: 'Domain',
-			before: domain.domain,
-			after: null
-		}]
-		const logsDb = getLogsDb()
-		logAction(logsDb, 'domain_logs', 'deleted', params.id, clientInfo, domainDiff)
-		logsDb.close()
-
-		sendJson(res, 200, { success: true })
-		setImmediate(() => scheduleGatewayReload())
 	})
 
 	// Delete domain with all its links
@@ -2375,20 +2538,8 @@ export function setupExternalRoutes(router, auth) {
 		db.close()
 		statsDb.close()
 		sendJson(res, 200, {
-			links: links.map(link => ({
-				id: link.id,
-				domain_id: link.domain_id,
-				domain: link.domain,
-				slug: link.slug,
-				url: link.url,
-				expired_url: link.expired_url,
-				keep_referrer: link.keep_referrer === 1,
-				keep_query_params: link.keep_query_params === 1,
-				redirect_code: link.redirect_code,
-				created: link.created,
-				changed: link.changed,
-				expire: link.expire,
-				comment: link.comment,
+			links: links.map(link => formatLinkForApi({
+				...link,
 				click_count: clickCounts.get(link.id) || 0
 			})),
 			pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
@@ -2441,9 +2592,9 @@ export function setupExternalRoutes(router, auth) {
 					data.slug,
 					urlId,
 					expiredUrlId,
-					data.keep_referrer ? 1 : 0,
-					data.keep_query_params ? 1 : 0,
-					data.redirect_code || 303,
+					sqlNullableBoolFromBody(data.keep_referrer) ?? null,
+					sqlNullableBoolFromBody(data.keep_query_params) ?? null,
+					sqlRedirectCodeFromBody(data.redirect_code) ?? null,
 					now,
 					now,
 					data.expire || null,
@@ -2507,26 +2658,38 @@ export function setupExternalRoutes(router, auth) {
 					db.prepare('UPDATE links SET expired_url_id = ? WHERE id = ?').run(expiredUrlId, params.id)
 				}
 
-				db.prepare(`
-					UPDATE links SET
-						slug = COALESCE(?, slug),
-						keep_referrer = COALESCE(?, keep_referrer),
-						keep_query_params = COALESCE(?, keep_query_params),
-						redirect_code = COALESCE(?, redirect_code),
-						changed = ?,
-						expire = ?,
-						comment = COALESCE(?, comment)
-					WHERE id = ?
-				`).run(
-					data.slug || null,
-					data.keep_referrer !== undefined ? (data.keep_referrer ? 1 : 0) : null,
-					data.keep_query_params !== undefined ? (data.keep_query_params ? 1 : 0) : null,
-					data.redirect_code || null,
-					Date.now(),
-					data.expire || null,
-					data.comment || null,
-					params.id
-				)
+				const extSets = []
+				const extParams = []
+				if (data.slug !== undefined && data.slug !== null) {
+					extSets.push('slug = ?')
+					extParams.push(data.slug)
+				}
+				if (data.keep_referrer !== undefined) {
+					extSets.push('keep_referrer = ?')
+					extParams.push(sqlNullableBoolFromBody(data.keep_referrer))
+				}
+				if (data.keep_query_params !== undefined) {
+					extSets.push('keep_query_params = ?')
+					extParams.push(sqlNullableBoolFromBody(data.keep_query_params))
+				}
+				if (data.redirect_code !== undefined) {
+					extSets.push('redirect_code = ?')
+					extParams.push(sqlRedirectCodeFromBody(data.redirect_code))
+				}
+				extSets.push('changed = ?')
+				extParams.push(Date.now())
+				if (data.expire !== undefined) {
+					extSets.push('expire = ?')
+					extParams.push(data.expire || null)
+				}
+				if (data.comment !== undefined) {
+					extSets.push('comment = ?')
+					extParams.push(data.comment || null)
+				}
+				extParams.push(params.id)
+				if (extSets.length > 1) {
+					db.prepare(`UPDATE links SET ${extSets.join(', ')} WHERE id = ?`).run(...extParams)
+				}
 			})
 			transaction(body)
 			db.close()

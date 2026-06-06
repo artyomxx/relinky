@@ -3,7 +3,8 @@ import { getRedirectablesDb, getMainDb } from '../shared/db.js'
 class Cache {
 	constructor() {
 		this.domains = [] // [[id, domain], ...]
-		this.links = [] // [{id, domain_id, slug, url, expired_url, redirect_code, expire, ...}, ...]
+		this.domainOverrides = new Map() // id -> override row
+		this.links = []
 		this.settings = {}
 		this.defaults = {}
 		this.load()
@@ -13,29 +14,48 @@ class Cache {
 		const redirectablesDb = getRedirectablesDb()
 		const mainDb = getMainDb()
 
-		// Load domains: [[id, domain], ...]
-		const domainsStmt = redirectablesDb.prepare('SELECT id, domain FROM domains')
-		this.domains = domainsStmt.all().map(row => [row.id, row.domain])
+		const domainsStmt = redirectablesDb.prepare(`
+			SELECT
+				d.id,
+				d.domain,
+				d.expired_url_id,
+				d.redirect_code,
+				d.keep_referrer,
+				d.keep_query_params,
+				d.error_404_url,
+				d.error_500_url,
+				eu.url AS expired_url
+			FROM domains d
+			LEFT JOIN expired_urls eu ON d.expired_url_id = eu.id
+		`)
+		const domainRows = domainsStmt.all()
+		this.domains = domainRows.map(row => [row.id, row.domain])
+		this.domainOverrides = new Map()
+		for (const row of domainRows) {
+			this.domainOverrides.set(row.id, {
+				expired_url: row.expired_url || null,
+				redirect_code: row.redirect_code,
+				keep_referrer: row.keep_referrer,
+				keep_query_params: row.keep_query_params,
+				error_404_url: row.error_404_url || null,
+				error_500_url: row.error_500_url || null
+			})
+		}
 
-		// Load settings
 		const settingsStmt = mainDb.prepare('SELECT key, value FROM settings')
-		const settingsRows = settingsStmt.all()
 		this.settings = {}
-		for (const row of settingsRows) {
+		for (const row of settingsStmt.all()) {
 			this.settings[row.key] = row.value
 		}
 
-		// Load defaults
 		const defaultsStmt = mainDb.prepare('SELECT key, value FROM defaults')
-		const defaultsRows = defaultsStmt.all()
 		this.defaults = {}
-		for (const row of defaultsRows) {
+		for (const row of defaultsStmt.all()) {
 			this.defaults[row.key] = row.value
 		}
 
-		// Load links with pre-filled relations
 		const linksStmt = redirectablesDb.prepare(`
-			SELECT 
+			SELECT
 				l.id,
 				l.domain_id,
 				l.slug,
@@ -54,16 +74,15 @@ class Cache {
 			JOIN redirect_urls ru ON l.url_id = ru.id
 			LEFT JOIN expired_urls eu ON l.expired_url_id = eu.id
 		`)
-		const linksRows = linksStmt.all()
-		this.links = linksRows.map(row => ({
+		this.links = linksStmt.all().map(row => ({
 			id: row.id,
 			domain_id: row.domain_id,
 			slug: row.slug,
 			url: row.url,
-			expired_url: row.expired_url,
-			keep_referrer: row.keep_referrer === 1,
-			keep_query_params: row.keep_query_params === 1,
-			redirect_code: row.redirect_code || parseInt(this.defaults.redirect_code) || 303,
+			expired_url: row.expired_url || null,
+			keep_referrer: row.keep_referrer,
+			keep_query_params: row.keep_query_params,
+			redirect_code: row.redirect_code,
 			created: row.created,
 			changed: row.changed,
 			expire: row.expire,
@@ -75,15 +94,18 @@ class Cache {
 	}
 
 	findDomain(hostname) {
-		return this.domains.find(([id, domain]) => domain === hostname)
+		return this.domains.find(([, domain]) => domain === hostname)
 	}
 
 	findLink(domainId, slug) {
-		// Clean slug: remove leading/trailing slashes
 		const cleanSlug = slug.replace(/^\/+|\/+$/g, '')
-		return this.links.find(link => 
+		return this.links.find(link =>
 			link.domain_id === domainId && link.slug === cleanSlug
 		)
+	}
+
+	getDomainOverrides(domainId) {
+		return this.domainOverrides.get(domainId) || null
 	}
 
 	getDefault(key) {
@@ -96,4 +118,3 @@ class Cache {
 }
 
 export default new Cache()
-

@@ -7,6 +7,7 @@ export const useDomainsStore = defineStore('domains', () => {
 	// Global defaults shown on the Domains page: `settings` = error URLs, `defaults` = link defaults.
 	const settings = ref({})
 	const defaults = ref({})
+	const overridesById = ref({})
 	const loading = ref(false)
 
 	const authStore = useAuthStore()
@@ -101,10 +102,47 @@ export const useDomainsStore = defineStore('domains', () => {
 		return await response.json()
 	}
 
-	async function deleteDomain(id) {
+	async function fetchDomainOverrides(id, { force = false } = {}) {
+		const key = String(id)
+		if (!force && overridesById.value[key]) {
+			return overridesById.value[key]
+		}
+		const response = await authStore.authedFetch(`/api/domains/${id}`)
+		if (!response.ok) {
+			const data = await response.json()
+			throw new Error(data.error || 'Failed to fetch domain settings')
+		}
+		const data = await response.json()
+		overridesById.value[key] = data.overrides || {}
+		return overridesById.value[key]
+	}
+
+	async function updateDomainOverrides(id, partial) {
 		const response = await authStore.authedFetch(`/api/domains/${id}`, {
-			method: 'DELETE',
-			headers: authStore.getAuthHeader()
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json',
+				...authStore.getAuthHeader()
+			},
+			body: JSON.stringify(partial)
+		})
+		if (!response.ok) {
+			const data = await response.json()
+			throw new Error(data.error || 'Failed to update domain settings')
+		}
+		const data = await response.json()
+		overridesById.value[String(id)] = data.overrides || {}
+		return data.overrides
+	}
+
+	async function deleteDomainWithLinks(domainName) {
+		const response = await authStore.authedFetch('/api/domains/delete-with-links', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				...authStore.getAuthHeader()
+			},
+			body: JSON.stringify({ domain: domainName })
 		})
 
 		if (!response.ok) {
@@ -119,11 +157,14 @@ export const useDomainsStore = defineStore('domains', () => {
 		domains,
 		settings,
 		defaults,
+		overridesById,
 		loading,
 		fetchDomains,
 		fetchDefaults,
+		fetchDomainOverrides,
 		updateDefaults,
+		updateDomainOverrides,
 		createDomain,
-		deleteDomain
+		deleteDomainWithLinks
 	}
 })

@@ -423,7 +423,7 @@ onUnmounted(() => {
 }
 
 .links-table tbody tr.link-row:hover {
-	background: color-mix(in srgb, var(--bg-tertiary) 65%, var(--bg-secondary));
+	background: var(--bg-secondary-hover);
 }
 
 .links-table th,

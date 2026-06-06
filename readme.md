@@ -246,6 +246,19 @@ If neither env nor onboarding has run yet, the admin UI stays on onboarding unti
 
 ---
 
+## Domains: global and per-domain defaults
+
+The **Domains** page has two layers:
+
+1. **Global defaults** (`GET/PUT /api/domains/defaults`) — default domain, link defaults (expired URL, redirect code, keep referrer/query), and global error redirect URLs (`error_404_url`, `error_500_url` in `main.db`).
+2. **Per-domain overrides** (`GET/PUT /api/domains/:id`) — optional values on each redirect hostname. `null` means inherit from global. Partial `PUT` updates only the fields you send; `null` clears an override.
+
+At redirect time the redirector resolves **link → domain → global** for link fields (`redirect_code`, `keep_referrer`, `keep_query_params`, expired URL). Unknown slugs use **domain → global** error URLs; an unknown hostname uses global error URLs only.
+
+Links can store `null` on those fields to inherit (set **Default** in the link form). Existing links keep their stored values until edited.
+
+---
+
 ## External Automation API
 
 Create keys in **Tools → API keys**.
@@ -255,6 +268,10 @@ Capabilities:
 - Links: list/create/update/delete
 - Stats: read
 - Optional IP allowlist per key (exact IP and CIDR)
+
+Link fields `redirect_code`, `keep_referrer`, and `keep_query_params` accept JSON `null` on create/update to inherit (link → domain → global). List responses return `null` for inherit; `false`/`0` means explicitly off.
+
+Domain defaults and per-domain overrides are admin-only (not exposed on external routes).
 
 Auth format:
 
@@ -284,6 +301,12 @@ curl -sS -X POST "$BASE/api/external/links" \
     -H "Authorization: Bearer $API_KEY" \
     -H "Content-Type: application/json" \
     -d '{"domain":"go.example.com","slug":"promo-2026","url":"https://example.com/landing","redirect_code":303}'
+
+# Create link that inherits redirect code and bool defaults from domain/global settings
+curl -sS -X POST "$BASE/api/external/links" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"domain":"go.example.com","slug":"inherit-settings","url":"https://example.com/x","redirect_code":null,"keep_referrer":null,"keep_query_params":null}'
 ```
 
 ---
