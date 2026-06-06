@@ -170,7 +170,7 @@ nav {
 }
 
 .nav-link:hover {
-	background: var(--bg-hover);
+	background: var(--bg-secondary-hover);
 }
 
 .nav-link.router-link-active {

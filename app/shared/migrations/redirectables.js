@@ -43,5 +43,54 @@ export default [
 				CREATE INDEX IF NOT EXISTS idx_links_domain_slug ON links(domain_id, slug);
 			`)
 		}
+	},
+	{
+		name: 'domain_overrides_and_nullable_link_defaults',
+		up(db) {
+			db.exec(`
+				ALTER TABLE domains ADD COLUMN expired_url_id INTEGER REFERENCES expired_urls(id);
+				ALTER TABLE domains ADD COLUMN redirect_code INTEGER;
+				ALTER TABLE domains ADD COLUMN keep_referrer INTEGER;
+				ALTER TABLE domains ADD COLUMN keep_query_params INTEGER;
+				ALTER TABLE domains ADD COLUMN error_404_url TEXT;
+				ALTER TABLE domains ADD COLUMN error_500_url TEXT;
+			`)
+
+			db.exec(`
+				CREATE TABLE links_new (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					domain_id INTEGER NOT NULL,
+					slug TEXT NOT NULL,
+					url_id INTEGER NOT NULL,
+					expired_url_id INTEGER,
+					keep_referrer INTEGER,
+					keep_query_params INTEGER,
+					redirect_code INTEGER,
+					created INTEGER NOT NULL,
+					changed INTEGER NOT NULL,
+					expire INTEGER,
+					comment TEXT,
+					UNIQUE(domain_id, slug),
+					FOREIGN KEY (domain_id) REFERENCES domains(id),
+					FOREIGN KEY (url_id) REFERENCES redirect_urls(id),
+					FOREIGN KEY (expired_url_id) REFERENCES expired_urls(id)
+				);
+
+				INSERT INTO links_new (
+					id, domain_id, slug, url_id, expired_url_id,
+					keep_referrer, keep_query_params, redirect_code,
+					created, changed, expire, comment
+				)
+				SELECT
+					id, domain_id, slug, url_id, expired_url_id,
+					keep_referrer, keep_query_params, redirect_code,
+					created, changed, expire, comment
+				FROM links;
+
+				DROP TABLE links;
+				ALTER TABLE links_new RENAME TO links;
+				CREATE INDEX IF NOT EXISTS idx_links_domain_slug ON links(domain_id, slug);
+			`)
+		}
 	}
 ]

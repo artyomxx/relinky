@@ -59,7 +59,7 @@ const routes = [
 				component: StatsView
 			},
 			{
-				path: 'domains',
+				path: 'domains/:domainId?',
 				name: 'domains',
 				component: DomainsView
 			},

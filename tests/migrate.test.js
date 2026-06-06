@@ -13,7 +13,7 @@ const initDbEntry = 'app/shared/init-db.js'
 // new migrations are added in later phases.
 const expectedVersions = {
 	'main.db': 2,
-	'redirectables.db': 1,
+	'redirectables.db': 2,
 	'stats.db': 1,
 	'logs.db': 1
 }

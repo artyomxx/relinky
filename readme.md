@@ -246,6 +246,19 @@ If neither env nor onboarding has run yet, the admin UI stays on onboarding unti
 
 ---
 
+## Domains: global and per-domain defaults
+
+The **Domains** page has two layers:
+
+1. **Global defaults** (`GET/PUT /api/domains/defaults`) — default domain, link defaults (expired URL, redirect code, keep referrer/query), and global error redirect URLs (`error_404_url`, `error_500_url` in `main.db`).
+2. **Per-domain overrides** (`GET/PUT /api/domains/:id`) — optional values on each redirect hostname. `null` means inherit from global. Partial `PUT` updates only the fields you send; `null` clears an override.
+
+At redirect time the redirector resolves **link → domain → global** for link fields (`redirect_code`, `keep_referrer`, `keep_query_params`, expired URL). Unknown slugs use **domain → global** error URLs; an unknown hostname uses global error URLs only.
+
+Links can store `null` on those fields to inherit (set **Default** in the link form). Existing links keep their stored values until edited.
+
+---
+
 ## External Automation API
 
 Create keys in **Tools → API keys**.

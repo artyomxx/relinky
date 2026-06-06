@@ -1,58 +1,83 @@
 <template>
-	<div class="danger-zone settings-card settings-card-danger">
-		<div class="form-group">
-			<select v-model="dangerZoneDomainModel" :disabled="deletingDomain">
-				<option value="">Select domain</option>
-				<option v-for="domain in domains" :key="domain.id" :value="domain.domain">
+	<div class='danger-zone settings-card settings-card-danger'>
+		<div class=form-group>
+			<select v-model=dangerZoneDomain :disabled=deleting>
+				<option disabled selected value=''>Select domain</option>
+				<option v-for="domain in domainsStore.domains" :key=domain.id :value=domain.domain>
 					{{ domain.domain }}
 				</option>
 			</select>
 		</div>
-		<div v-if="showDomainConfirmInput" class="form-group">
-			<label>Type domain name to confirm: <strong>{{ dangerZoneDomain }}</strong></label>
+		<div v-if=showConfirmInput class=form-group>
 			<input
-				v-model="domainConfirmInputModel"
-				type="text"
-				placeholder="Enter domain name"
-				:ref="domainConfirmInputRefSetter"
-				@keyup.enter="confirmDeleteDomain"
+				ref=confirmInputRef
+				v-model=confirmInput
+				type=text
+				:placeholder='`Type domain name to confirm (${dangerZoneDomain})`'
+				@keyup.enter=confirmDelete
 			/>
 		</div>
 		<button
-			@click="showDomainConfirmInput ? confirmDeleteDomain() : showDeleteDomainConfirm()"
-			:disabled="!dangerZoneDomain || deletingDomain"
-			class="btn-danger"
+			@click='showConfirmInput ? confirmDelete() : showDeleteConfirm()'
+			:disabled='!dangerZoneDomain || deleting'
+			class=btn-danger
 		>
-			{{ deletingDomain ? 'Deleting...' : 'Delete domain with all its links' }}
+			{{ deleting ? 'Deleting...' : 'Delete domain with all its links' }}
 		</button>
 	</div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, watch, nextTick } from 'vue'
+import { useDomainsStore } from '../../stores/domains.js'
 
-const props = defineProps({
-	domains: { type: Array, required: true },
-	dangerZoneDomain: { type: String, required: true },
-	showDomainConfirmInput: { type: Boolean, required: true },
-	domainConfirmInput: { type: String, required: true },
-	domainConfirmInputRefSetter: { type: Function, required: true },
-	deletingDomain: { type: Boolean, required: true },
-	confirmDeleteDomain: { type: Function, required: true },
-	showDeleteDomainConfirm: { type: Function, required: true }
+const domainsStore = useDomainsStore()
+
+const dangerZoneDomain = ref('')
+const showConfirmInput = ref(false)
+const confirmInput = ref('')
+const confirmInputRef = ref(null)
+const deleting = ref(false)
+
+watch(dangerZoneDomain, () => {
+	showConfirmInput.value = false
+	confirmInput.value = ''
 })
 
-const emit = defineEmits(['update:dangerZoneDomain', 'update:domainConfirmInput'])
+function showDeleteConfirm() {
+	if (!dangerZoneDomain.value) return
+	showConfirmInput.value = true
+	confirmInput.value = ''
+	nextTick(() => {
+		confirmInputRef.value?.focus()
+	})
+}
 
-const dangerZoneDomainModel = computed({
-	get: () => props.dangerZoneDomain,
-	set: value => emit('update:dangerZoneDomain', value)
-})
+async function confirmDelete() {
+	if (!dangerZoneDomain.value) return
 
-const domainConfirmInputModel = computed({
-	get: () => props.domainConfirmInput,
-	set: value => emit('update:domainConfirmInput', value)
-})
+	if (confirmInput.value !== dangerZoneDomain.value) {
+		alert('Please type the exact domain name to confirm deletion')
+		return
+	}
+
+	if (!confirm(`Are you sure you want to delete domain "${dangerZoneDomain.value}" and ALL its links? This action cannot be undone.`)) {
+		return
+	}
+
+	deleting.value = true
+	try {
+		await domainsStore.deleteDomainWithLinks(dangerZoneDomain.value)
+		alert('Domain and all its links deleted successfully')
+		dangerZoneDomain.value = ''
+		showConfirmInput.value = false
+		confirmInput.value = ''
+	} catch (err) {
+		alert(err.message)
+	} finally {
+		deleting.value = false
+	}
+}
 </script>
 
 <style scoped>

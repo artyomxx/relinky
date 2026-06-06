@@ -5,6 +5,8 @@
 	--bg-tertiary: #2d2d30;
 	--bg-border: #3e3e42;
 	--bg-hover: #2d2d30;
+
+	--bg-secondary-hover: color-mix(in srgb, var(--bg-tertiary) 65%, var(--bg-secondary));
 	
 	/* Text colors */
 	--text-primary: #d4d4d4;
@@ -51,7 +53,7 @@
 	/* Form pending data (shimmer on real controls until loaded) */
 	--form-pending-base: var(--bg-secondary);
 	--form-pending-mid: var(--bg-tertiary);
-	--form-pending-highlight: color-mix(in srgb, var(--bg-hover) 70%, var(--text-secondary) 8%);
+	--form-pending-highlight: var(--bg-secondary-hover);
 }
 
 * {
@@ -101,7 +103,7 @@ button:disabled {
 }
 
 .btn-secondary:hover {
-	background: var(--bg-hover);
+	background: var(--bg-secondary-hover);
 }
 
 .btn-secondary:disabled {
@@ -307,7 +309,7 @@ a.link-small {
 
 .tab-link:hover,
 .tab-button:hover {
-	background: var(--bg-hover);
+	background: var(--bg-secondary-hover);
 }
 
 .tab-link.active,
@@ -393,11 +395,7 @@ a.link-small {
 	cursor: pointer;
 }
 
-.form-group label:has(input[type="checkbox"]) input[type="checkbox"] {
-	width: auto;
-}
-
-.form-group input,
+.form-group input:not([type="checkbox"]):not([type="radio"]),
 .form-group textarea,
 .form-group select {
 	width: 100%;
@@ -414,16 +412,8 @@ a.link-small {
 /* Status line left of action buttons (loading / saving / feedback) */
 .form-status-bar {
 	flex: 1 1 auto;
-	margin-right: auto;
-	min-height: 1.25rem;
-	font-size: 0.875rem;
-	line-height: 1.25rem;
+	margin-right: .5rem;
 	color: var(--text-secondary);
-	text-align: left;
-}
-
-.form-status-bar:empty {
-	display: none;
 }
 
 .form-status-bar--loading,

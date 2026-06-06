@@ -114,43 +114,55 @@
 										:class="{ 'field-changed': isFieldChanged('expire') }"
 									/>
 								</div>
-								<div class="form-group">
+								<div class=form-group>
 									<label :class="{ 'label-disabled': !expireEnabled }">Expired URL (optional)</label>
 									<input
-										v-model="formData.expired_url"
-										type="text"
+										ref=expiredUrlInput
+										v-model=formData.expired_url
+										type=text
+										:placeholder=expiredUrlPlaceholder
+										pattern='.*\.\S+.*'
+										title='URL must contain at least one top-level domain (e.g., .com, .org)'
 										:disabled="!expireEnabled"
 										:class="{ 'field-changed': isFieldChanged('expired_url') }"
-										@blur="handleExpiredUrlBlur"
+										@blur=handleExpiredUrlBlur
+										@keydown.enter.prevent=handleExpiredUrlEnter
 									/>
 								</div>
 							</div>
 
 							<div class="link-form-tab-slide" data-tab="advanced" :inert="activeTab !== 'advanced'">
-								<div class="form-group">
+								<div class=form-group>
 									<label>Redirect Code</label>
 									<select
-										v-model="formData.redirect_code"
+										v-model=formData.redirect_code
 										:class="{ 'field-changed': isFieldChanged('redirect_code') }"
 									>
-										<option value="301">301 - Permanent</option>
-										<option value="302">302 - Found</option>
-										<option value="303">303 - See Other</option>
-										<option value="307">307 - Temporary</option>
-										<option value="308">308 - Permanent</option>
+										<option :value=null>Domain default ({{ redirectCodeDefault }})</option>
+										<option value=301>301 - Permanent</option>
+										<option value=302>302 - Found</option>
+										<option value=303>303 - See Other</option>
+										<option value=307>307 - Temporary</option>
+										<option value=308>308 - Permanent</option>
 									</select>
 								</div>
-								<div class="form-group">
-									<label :class="{ 'field-changed': isFieldChanged('keep_referrer') }">
-										<input type="checkbox" v-model="formData.keep_referrer" />
-										Keep Referrer
-									</label>
+								<div class=form-group>
+									<label :class="{ 'field-changed': isFieldChanged('keep_referrer') }">Keep Referrer</label>
+									<TriStateRadio
+										name=link-keep-referrer
+										v-model=formData.keep_referrer
+										default-label='Domain default'
+										:default-label-hint-value=referrerDefaultHint
+									/>
 								</div>
-								<div class="form-group">
-									<label :class="{ 'field-changed': isFieldChanged('keep_query_params') }">
-										<input type="checkbox" v-model="formData.keep_query_params" />
-										Keep Query Params
-									</label>
+								<div class=form-group>
+									<label :class="{ 'field-changed': isFieldChanged('keep_query_params') }">Keep Query Params</label>
+									<TriStateRadio
+										name=link-keep-query
+										v-model=formData.keep_query_params
+										default-label='Domain default'
+										:default-label-hint-value=queryDefaultHint
+									/>
 								</div>
 							</div>
 						</div>
@@ -203,6 +215,13 @@ import { useLinksStore } from '../stores/links.js'
 import { useDomainsStore } from '../stores/domains.js'
 import { useFieldHint } from '../composables/useFieldHint.js'
 import FieldHint from './FieldHint.vue'
+import TriStateRadio from './TriStateRadio.vue'
+import { cleanUrl } from '../utils/normalize-url.js'
+import {
+	inheritBoolHint,
+	linkRedirectCodeDefault,
+	placeholderExpiredUrlForLink
+} from '../utils/placeholders.js'
 
 const props = defineProps({
 	link: Object
@@ -220,6 +239,7 @@ const formSyncing = ref(false)
 const formRef = ref(null)
 const slugInput = ref(null)
 const urlInput = ref(null)
+const expiredUrlInput = ref(null)
 const cancelButton = ref(null)
 const submitButton = ref(null)
 const initialFormData = ref(null)
@@ -336,9 +356,46 @@ const formData = ref({
 	expired_url: '',
 	expire: '',
 	comment: '',
-	redirect_code: '303',
-	keep_referrer: false,
-	keep_query_params: false
+	redirect_code: null,
+	keep_referrer: null,
+	keep_query_params: null
+})
+
+const selectedDomainId = computed(() => {
+	const row = domainsStore.domains.find(d => d.domain === formData.value.domain)
+	return row?.id ?? null
+})
+
+const selectedDomainOverrides = computed(() => {
+	const id = selectedDomainId.value
+	if (!id) return null
+	return domainsStore.overridesById[String(id)] || null
+})
+
+const expiredUrlPlaceholder = computed(() =>
+	placeholderExpiredUrlForLink(selectedDomainOverrides.value, domainsStore.defaults)
+)
+
+const redirectCodeDefault = computed(() =>
+	linkRedirectCodeDefault(selectedDomainOverrides.value, domainsStore.defaults)
+)
+
+const referrerDefaultHint = computed(() =>
+	inheritBoolHint(selectedDomainOverrides.value, domainsStore.defaults, 'keep_referrer')
+)
+
+const queryDefaultHint = computed(() =>
+	inheritBoolHint(selectedDomainOverrides.value, domainsStore.defaults, 'keep_query_params')
+)
+
+watch(selectedDomainId, async id => {
+	if (id) {
+		try {
+			await domainsStore.fetchDomainOverrides(id)
+		} catch {
+			// ignore
+		}
+	}
 })
 
 const linkFormKey = computed(() =>
@@ -422,9 +479,11 @@ async function initializeForm() {
 				expired_url: link.expired_url || '',
 				expire: hasExpire ? new Date(link.expire).toISOString().slice(0, 16) : '',
 				comment: link.comment || '',
-				redirect_code: link.redirect_code?.toString() || domainsStore.defaults.redirect_code || '303',
-				keep_referrer: link.keep_referrer !== undefined ? link.keep_referrer : (domainsStore.defaults.keep_referrer === 'true' || domainsStore.defaults.keep_referrer === true),
-				keep_query_params: link.keep_query_params !== undefined ? link.keep_query_params : (domainsStore.defaults.keep_query_params === 'true' || domainsStore.defaults.keep_query_params === true)
+				redirect_code: link.redirect_code === null || link.redirect_code === undefined
+					? null
+					: String(link.redirect_code),
+				keep_referrer: link.keep_referrer ?? null,
+				keep_query_params: link.keep_query_params ?? null
 			}
 		} else {
 			expireEnabled.value = false
@@ -440,12 +499,15 @@ async function initializeForm() {
 				domain: defaultDomain,
 				slug: '',
 				url: '',
-				expired_url: domainsStore.defaults.expired_url || '',
+				expired_url: '',
 				expire: '',
 				comment: '',
-				redirect_code: domainsStore.defaults.redirect_code || '303',
-				keep_referrer: domainsStore.defaults.keep_referrer === 'true' || domainsStore.defaults.keep_referrer === true,
-				keep_query_params: domainsStore.defaults.keep_query_params === 'true' || domainsStore.defaults.keep_query_params === true
+				redirect_code: null,
+				keep_referrer: null,
+				keep_query_params: null
+			}
+			if (selectedDomainId.value) {
+				await domainsStore.fetchDomainOverrides(selectedDomainId.value).catch(() => {})
 			}
 		}
 
@@ -489,7 +551,7 @@ function unlockPageScroll() {
 }
 
 // Expose bound function so parent can remove/add listener
-defineExpose({ hasChanges, boundHandleEscape })
+defineExpose({ hasChanges })
 
 onMounted(() => {
 	lockPageScroll()
@@ -514,32 +576,6 @@ watch(expireEnabled, (enabled) => {
 	}
 })
 
-function cleanUrl(url) {
-	if (!url) return url
-	url = url.trim()
-	
-	// Remove leading slashes that might cause issues
-	url = url.replace(/^\/+/, '')
-	
-	// Remove duplicate protocols (e.g., '/https:///https://example.com' -> 'https://example.com')
-	// Match protocol pattern and remove duplicates
-	url = url.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)+/g, (match) => {
-		// Extract the first protocol found
-		const protocolMatch = match.match(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)/)
-		return protocolMatch ? protocolMatch[1] : match
-	})
-	
-	// Remove any remaining leading slashes after protocol cleanup
-	url = url.replace(/^\/+/, '')
-	
-	// Check if URL already has any protocol (e.g., http://, https://, ftp://, mailto:, etc.)
-	if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)) {
-		return 'https://' + url
-	}
-	
-	return url
-}
-
 function handleSlugBlur() {
 	if (skipFieldBlurCheck) return
 	checkSlug()
@@ -552,10 +588,31 @@ function handleUrlBlur() {
 	checkUrl()
 }
 
-function handleExpiredUrlBlur() {
+function normalizeExpiredUrlField() {
 	if (formData.value.expired_url) {
 		formData.value.expired_url = cleanUrl(formData.value.expired_url)
 	}
+}
+
+function handleExpiredUrlBlur() {
+	if (skipFieldBlurCheck) return
+	normalizeExpiredUrlField()
+}
+
+async function handleExpiredUrlEnter() {
+	normalizeExpiredUrlField()
+	await nextTick()
+	const input = expiredUrlInput.value
+	if (!input || input.disabled) return
+	if (!input.checkValidity()) {
+		fieldHint.show({
+			anchor: input,
+			message: input.validationMessage || input.title || 'Please check this field.',
+			variant: 'error'
+		})
+		return
+	}
+	handleSubmit()
 }
 
 async function checkSlug() {
@@ -630,6 +687,7 @@ async function checkUrl() {
 function resolveSaveErrorAnchor(message) {
 	const text = message.toLowerCase()
 	if (text.includes('slug')) return slugInput.value
+	if (text.includes('expired url')) return expiredUrlInput.value
 	if (text.includes('top-level domain')) {
 		return urlInput.value
 	}
@@ -687,6 +745,7 @@ async function handleSubmit() {
 	if (formData.value.url) {
 		formData.value.url = cleanUrl(formData.value.url)
 	}
+	normalizeExpiredUrlField()
 
 	await nextTick()
 
@@ -707,9 +766,11 @@ async function handleSubmit() {
 	const data = {
 		...formData.value,
 		expire: expireEnabled.value && formData.value.expire ? new Date(formData.value.expire).getTime() : null,
-		redirect_code: parseInt(formData.value.redirect_code) || 303,
-		keep_referrer: formData.value.keep_referrer || false,
-		keep_query_params: formData.value.keep_query_params || false
+		redirect_code: formData.value.redirect_code === null || formData.value.redirect_code === ''
+			? null
+			: parseInt(formData.value.redirect_code, 10),
+		keep_referrer: formData.value.keep_referrer,
+		keep_query_params: formData.value.keep_query_params
 	}
 
 	formSyncing.value = true

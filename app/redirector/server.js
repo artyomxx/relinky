@@ -1,5 +1,12 @@
 import { createServer } from 'http'
 import cache from './cache.js'
+import {
+	resolveErrorUrl,
+	resolveExpiredUrl,
+	resolveKeepQueryParams,
+	resolveKeepReferrer,
+	resolveRedirectCode
+} from '../shared/resolve-settings.js'
 import statsQueue from './stats-queue.js'
 import { startWatcher, stopWatcher } from './watcher.js'
 import { getRedirectablesDb } from '../shared/db.js'
@@ -62,9 +69,12 @@ function sendClientRedirectWithFragment(res, targetUrl, referrerPolicy = 'no-ref
 	res.end(body)
 }
 
-function sendErrorOrRedirect(res, statusCode, fallbackText) {
-	const settingKey = statusCode === 404 ? 'error_404_url' : 'error_500_url'
-	const redirectUrl = cache.getSetting(settingKey)
+function sendErrorOrRedirect(res, statusCode, fallbackText, domainId = null) {
+	const domainOverrides = domainId != null ? cache.getDomainOverrides(domainId) : null
+	const redirectUrl = resolveErrorUrl(statusCode, domainOverrides, {
+		error_404_url: cache.getSetting('error_404_url'),
+		error_500_url: cache.getSetting('error_500_url')
+	})
 	if (redirectUrl) {
 		if (redirectUrl.includes('#')) {
 			sendClientRedirectWithFragment(res, redirectUrl)
@@ -114,28 +124,41 @@ const server = createServer((req, res) => {
 	}
 
 	const [domainId] = domainMatch
+	const domainOverrides = cache.getDomainOverrides(domainId)
 
 	// Find link by domain and slug
 	const link = cache.findLink(domainId, pathname)
 	if (!link) {
-		sendErrorOrRedirect(res, 404, 'Not Found')
+		sendErrorOrRedirect(res, 404, 'Not Found', domainId)
 		return
 	}
 
 	// Check expiration
 	const now = Date.now()
 	const isExpired = link.expire && link.expire < now
-	const targetUrl = isExpired ? (link.expired_url || cache.getDefault('expired_url')) : link.url
+	const targetUrl = isExpired
+		? resolveExpiredUrl(
+			link.expired_url,
+			domainOverrides?.expired_url,
+			cache.getDefault('expired_url')
+		)
+		: link.url
 
 	if (!targetUrl) {
-		sendErrorOrRedirect(res, 500, 'Internal Server Error')
+		sendErrorOrRedirect(res, 500, 'Internal Server Error', domainId)
 		return
 	}
+
+	const keepQueryParams = resolveKeepQueryParams(
+		link.keep_query_params,
+		domainOverrides?.keep_query_params,
+		cache.defaults
+	)
 
 	try {
 		// Build final URL
 		let finalUrl = targetUrl
-		if (link.keep_query_params && Object.keys(queryParams).length > 0) {
+		if (keepQueryParams && Object.keys(queryParams).length > 0) {
 			const urlObj = new URL(finalUrl)
 			for (const [key, value] of Object.entries(queryParams)) {
 				urlObj.searchParams.set(key, value)
@@ -143,8 +166,11 @@ const server = createServer((req, res) => {
 			finalUrl = urlObj.toString()
 		}
 
-		// Get redirect code
-		const redirectCode = link.redirect_code || parseInt(cache.getDefault('redirect_code')) || 303
+		const redirectCode = resolveRedirectCode(
+			link.redirect_code,
+			domainOverrides?.redirect_code,
+			cache.defaults
+		)
 
 		// Queue stats (async, non-blocking)
 		const redirectablesDb = getRedirectablesDb()
@@ -174,8 +200,12 @@ const server = createServer((req, res) => {
 			user_agent_string: req.headers['user-agent'] || null
 		})
 
-		// Redirect (see sendClientRedirectWithFragment — Location #fragment is ignored by browsers)
-		const referrerPolicy = link.keep_referrer ? 'unsafe-url' : 'no-referrer'
+		const keepReferrer = resolveKeepReferrer(
+			link.keep_referrer,
+			domainOverrides?.keep_referrer,
+			cache.defaults
+		)
+		const referrerPolicy = keepReferrer ? 'unsafe-url' : 'no-referrer'
 		if (finalUrl.includes('#')) {
 			sendClientRedirectWithFragment(res, finalUrl, referrerPolicy)
 			return
@@ -189,7 +219,7 @@ const server = createServer((req, res) => {
 		res.end()
 	} catch (err) {
 		console.error('[Redirector] Error while handling redirect:', err)
-		sendErrorOrRedirect(res, 500, 'Internal Server Error')
+		sendErrorOrRedirect(res, 500, 'Internal Server Error', domainId)
 	}
 })
 
