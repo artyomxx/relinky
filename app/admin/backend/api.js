@@ -2538,20 +2538,8 @@ export function setupExternalRoutes(router, auth) {
 		db.close()
 		statsDb.close()
 		sendJson(res, 200, {
-			links: links.map(link => ({
-				id: link.id,
-				domain_id: link.domain_id,
-				domain: link.domain,
-				slug: link.slug,
-				url: link.url,
-				expired_url: link.expired_url,
-				keep_referrer: link.keep_referrer === 1,
-				keep_query_params: link.keep_query_params === 1,
-				redirect_code: link.redirect_code,
-				created: link.created,
-				changed: link.changed,
-				expire: link.expire,
-				comment: link.comment,
+			links: links.map(link => formatLinkForApi({
+				...link,
 				click_count: clickCounts.get(link.id) || 0
 			})),
 			pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }

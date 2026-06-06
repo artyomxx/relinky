@@ -269,6 +269,10 @@ Capabilities:
 - Stats: read
 - Optional IP allowlist per key (exact IP and CIDR)
 
+Link fields `redirect_code`, `keep_referrer`, and `keep_query_params` accept JSON `null` on create/update to inherit (link → domain → global). List responses return `null` for inherit; `false`/`0` means explicitly off.
+
+Domain defaults and per-domain overrides are admin-only (not exposed on external routes).
+
 Auth format:
 
 ```bash
@@ -297,6 +301,12 @@ curl -sS -X POST "$BASE/api/external/links" \
     -H "Authorization: Bearer $API_KEY" \
     -H "Content-Type: application/json" \
     -d '{"domain":"go.example.com","slug":"promo-2026","url":"https://example.com/landing","redirect_code":303}'
+
+# Create link that inherits redirect code and bool defaults from domain/global settings
+curl -sS -X POST "$BASE/api/external/links" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"domain":"go.example.com","slug":"inherit-settings","url":"https://example.com/x","redirect_code":null,"keep_referrer":null,"keep_query_params":null}'
 ```
 
 ---

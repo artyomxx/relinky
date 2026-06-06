@@ -322,3 +322,51 @@ test('external create link rejects unknown domain', { concurrency: false }, asyn
 		await deleteApiKey(adminToken, key.id)
 	}
 })
+
+test('external link inherit fields round-trip as null on GET', { concurrency: false }, async () => {
+	const adminToken = await adminLogin()
+	const domain = `${testDomainPrefix.create}-inherit-${Date.now()}.${baseHost}`
+	const slug = `inherit-${Date.now()}`
+	await createDomain(adminToken, domain)
+	const { key, token } = await createApiKey(adminToken, { name: 'inherit-null-check' })
+	try {
+		const created = await req(pathExternalLinks, {
+			method: 'POST',
+			token,
+			body: {
+				domain,
+				slug,
+				url: pathUrl,
+				redirect_code: null,
+				keep_referrer: null,
+				keep_query_params: null
+			}
+		})
+		assert.equal(created.status, 201)
+		const linkId = created.data?.id
+		assert.ok(linkId)
+
+		const list = await req(`${pathExternalLinks}?search=${encodeURIComponent(slug)}`, { token })
+		assert.equal(list.status, 200)
+		const row = list.data?.links?.find(l => l.id === linkId)
+		assert.ok(row, 'created link should appear in external list')
+		assert.equal(row.redirect_code, null)
+		assert.equal(row.keep_referrer, null)
+		assert.equal(row.keep_query_params, null)
+
+		assert.equal((await req(`${pathExternalLinks}/${linkId}`, {
+			method: 'PUT',
+			token,
+			body: { keep_referrer: false, redirect_code: 301 }
+		})).status, 200)
+
+		const listAfter = await req(`${pathExternalLinks}?search=${encodeURIComponent(slug)}`, { token })
+		const updated = listAfter.data?.links?.find(l => l.id === linkId)
+		assert.equal(updated.keep_referrer, false)
+		assert.equal(updated.redirect_code, 301)
+		assert.equal(updated.keep_query_params, null)
+	} finally {
+		await deleteApiKey(adminToken, key.id)
+		await cleanupDomain(adminToken, domain)
+	}
+})
