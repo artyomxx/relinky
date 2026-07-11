@@ -2,11 +2,16 @@
 # Coolify (two Domains fields): use docker-compose.coolify.yml instead.
 # Self-hosted HTTPS + UI-driven redirect domains in one box:
 #   docker compose -f docker-compose.gateway.yml up -d
+#
+# Pre-built GHCR image (no local build):
+#   RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest docker compose pull
+#   RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest docker compose up -d --no-build
 
 name: relinky
 
 services:
   relinky:
+    image: ${RELINKY_IMAGE:-relinky:local}
     build: .
     container_name: relinky
     env_file:
