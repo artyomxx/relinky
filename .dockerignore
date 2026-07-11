@@ -1,0 +1,15 @@
+.git
+.github
+.cursor
+.env
+.env.*
+!.env.example
+node_modules
+db
+app/admin/frontend/dist
+.not-in-git
+.DS_Store
+*.log
+*.md
+relinky.png
+docker-compose*.yml

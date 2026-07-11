@@ -1,0 +1,39 @@
+# Pre-built image from GHCR (no local build). Same layout as docker-compose.yml.
+# Gateway / auto-TLS: docker-compose.ghcr.gateway.yml
+#
+#   docker pull ghcr.io/artyomxx/relinky:latest
+#   docker compose -f docker-compose.ghcr.yml up -d
+
+name: relinky
+
+services:
+	relinky:
+		image: ${RELINKY_IMAGE:-ghcr.io/artyomxx/relinky:latest}
+		container_name: relinky
+		env_file:
+			- path: .env
+				required: false
+		ports:
+			- '${ADMIN_PORT:-8081}:8081'
+			- '${REDIRECTOR_PORT:-8082}:8082'
+		volumes:
+			- ./db:/app/db
+		environment:
+			- ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
+			- ADMIN_IP=${ADMIN_IP:-0.0.0.0}
+			- ADMIN_PORT=${ADMIN_PORT:-8081}
+			- REDIRECTOR_IP=${REDIRECTOR_IP:-0.0.0.0}
+			- REDIRECTOR_PORT=${REDIRECTOR_PORT:-8082}
+		healthcheck:
+			test:
+				[
+					'CMD',
+					'node',
+					'-e',
+					"Promise.all([fetch('http://127.0.0.1:8081/-healthcheck'),fetch('http://127.0.0.1:8082/-healthcheck')]).then(rs=>rs.every(r=>r.ok)?process.exit(0):process.exit(1)).catch(()=>process.exit(1))",
+				]
+			interval: 30s
+			timeout: 5s
+			retries: 3
+			start_period: 25s
+		restart: unless-stopped
