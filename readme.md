@@ -80,19 +80,21 @@ docker pull ghcr.io/artyomxx/relinky:latest   # stable
 docker pull ghcr.io/artyomxx/relinky:dev      # pre-release
 ```
 
-Run with pre-built images (same env vars as the `build: .` compose files):
-
-| Mode | Compose file |
-|------|----------------|
-| Plain (8081/8082) | [`docker-compose.ghcr.yml`](./docker-compose.ghcr.yml) |
-| Gateway + Caddy | [`docker-compose.ghcr.gateway.yml`](./docker-compose.ghcr.gateway.yml) |
-
-Compose defaults to `:latest`. Override the channel or pin a version:
+Run with a pre-built image — set `RELINKY_IMAGE`, pull, then start without building:
 
 ```bash
-RELINKY_IMAGE=ghcr.io/artyomxx/relinky:dev docker compose -f docker-compose.ghcr.gateway.yml up -d
-RELINKY_IMAGE=ghcr.io/artyomxx/relinky:1.0.0 docker compose -f docker-compose.ghcr.gateway.yml up -d
+export RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest
+docker compose pull && docker compose up -d --no-build
 ```
+
+Gateway mode: add `-f docker-compose.gateway.yml`. Pin a version or channel:
+
+```bash
+RELINKY_IMAGE=ghcr.io/artyomxx/relinky:dev docker compose pull
+RELINKY_IMAGE=ghcr.io/artyomxx/relinky:1.0.0 docker compose -f docker-compose.gateway.yml up -d --no-build
+```
+
+Local build from source (default tag `relinky:local`): `docker compose up -d --build`
 
 ---
 
@@ -122,10 +124,10 @@ Use when:
 Start:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Or pull a pre-built image: [`docker-compose.ghcr.yml`](./docker-compose.ghcr.yml) (see [Pre-built image](#pre-built-image-ghcr)).
+Pre-built image: set `RELINKY_IMAGE` (see [Pre-built image](#pre-built-image-ghcr)).
 
 ### Mode 2: Gateway, embedded [Caddy](https://github.com/caddyserver/caddy) ([`docker-compose.gateway.yml`](./docker-compose.gateway.yml))
 
@@ -202,10 +204,10 @@ Start:
 export RELINKY_ADMIN_HOST='admin.example.com'
 export ACME_EMAIL='you@example.com'
 # optional: export ADMIN_PASSWORD_HASH='...'
-docker compose -f docker-compose.gateway.yml up -d
+docker compose -f docker-compose.gateway.yml up -d --build
 ```
 
-Or use the pre-built image: [`docker-compose.ghcr.gateway.yml`](./docker-compose.ghcr.gateway.yml) (see [Pre-built image](#pre-built-image-ghcr)).
+Pre-built image: `RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest docker compose -f docker-compose.gateway.yml pull && … up -d --no-build` (see [Pre-built image](#pre-built-image-ghcr)).
 
 After startup:
 

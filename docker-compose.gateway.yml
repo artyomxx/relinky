@@ -17,11 +17,16 @@
 #
 # "Bind for 0.0.0.0:443 failed: port is already allocated" → another app owns 443 (e.g. Coolify).
 # Set RELINKY_GATEWAY_HOST_HTTPS=8443 and RELINKY_CADDY_HTTPS_PORT=8443 (and matching HTTP if 80 is taken).
+#
+# Pre-built GHCR image (no local build):
+#   RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest docker compose -f docker-compose.gateway.yml pull
+#   RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest docker compose -f docker-compose.gateway.yml up -d --no-build
 
 name: relinky
 
 services:
   relinky:
+    image: ${RELINKY_IMAGE:-relinky:local}
     build: .
     container_name: relinky-gateway
     env_file:
