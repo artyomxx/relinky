@@ -16,6 +16,7 @@ Minimal self-hosted link redirector with admin UI, stats, SQLite storage and API
 ### Table of contents
 
 - [Architecture overview](#architecture-overview)
+- [Pre-built image (GHCR)](#pre-built-image-ghcr)
 - [Hosting modes](#hosting-modes)
   - [1. Plain Docker](#mode-1-plain-docker-docker-composeyml)
   - [2. Gateway, embedded Caddy](#mode-2-gateway-embedded-caddy-docker-composegatewayyml)
@@ -56,6 +57,45 @@ Databases:
 
 ---
 
+## Pre-built image (GHCR)
+
+Multi-arch images (`linux/amd64`, `linux/arm64`) are published to [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+
+### Branches and tags
+
+| Git ref | Role | Image tags | Who should use it |
+|---------|------|------------|-------------------|
+| `main` | Development | `dev`, `main`, `main-<sha>` | Early testers, your own staging |
+| `release` | Stable line | `latest`, `stable`, `release`, `release-<sha>` | Production self-hosting, PaaS recipes |
+| `v1.2.3` (git tag) | Pinned release | `1.2.3`, `1.2`, `1`, `latest`, `stable`, `<sha>` | Pin a specific version |
+
+**Default for operators:** `ghcr.io/artyomxx/relinky:latest` (tracks `release` and version tags).
+
+**Try in-development builds:** `ghcr.io/artyomxx/relinky:dev` (tracks `main`).
+
+Pull:
+
+```bash
+docker pull ghcr.io/artyomxx/relinky:latest   # stable
+docker pull ghcr.io/artyomxx/relinky:dev      # pre-release
+```
+
+Run with pre-built images (same env vars as the `build: .` compose files):
+
+| Mode | Compose file |
+|------|----------------|
+| Plain (8081/8082) | [`docker-compose.ghcr.yml`](./docker-compose.ghcr.yml) |
+| Gateway + Caddy | [`docker-compose.ghcr.gateway.yml`](./docker-compose.ghcr.gateway.yml) |
+
+Compose defaults to `:latest`. Override the channel or pin a version:
+
+```bash
+RELINKY_IMAGE=ghcr.io/artyomxx/relinky:dev docker compose -f docker-compose.ghcr.gateway.yml up -d
+RELINKY_IMAGE=ghcr.io/artyomxx/relinky:1.0.0 docker compose -f docker-compose.ghcr.gateway.yml up -d
+```
+
+---
+
 ## Hosting modes
 
 ### Mode 1: Plain Docker ([`docker-compose.yml`](./docker-compose.yml))
@@ -84,6 +124,8 @@ Start:
 ```bash
 docker compose up -d
 ```
+
+Or pull a pre-built image: [`docker-compose.ghcr.yml`](./docker-compose.ghcr.yml) (see [Pre-built image](#pre-built-image-ghcr)).
 
 ### Mode 2: Gateway, embedded [Caddy](https://github.com/caddyserver/caddy) ([`docker-compose.gateway.yml`](./docker-compose.gateway.yml))
 
@@ -162,6 +204,8 @@ export ACME_EMAIL='you@example.com'
 # optional: export ADMIN_PASSWORD_HASH='...'
 docker compose -f docker-compose.gateway.yml up -d
 ```
+
+Or use the pre-built image: [`docker-compose.ghcr.gateway.yml`](./docker-compose.ghcr.gateway.yml) (see [Pre-built image](#pre-built-image-ghcr)).
 
 After startup:
 
@@ -375,6 +419,8 @@ npm run test:spec
 ```
 
 `npm run dev` runs migrations/seed once (`dev:prepare`), then watches `app/admin/backend/server.js` and `app/redirector/server.js` (plus Vite). Do **not** watch `start-dev.js` / `start.js` — Node's supervisor + `--watch` + spawned children loops on macOS. `dev:backend` (no watch) still uses `start-dev.js` if you only need the API processes. Loads [`.env`](./.env) via `--env-file-if-exists`. For normal local work, uncomment the dev `ADMIN_PASSWORD_HASH` in `.env` (password `dev`). To test onboarding, leave it unset and start with an empty `db/` directory.
+
+**Branches:** `main` is the active development line (GHCR `:dev`). Merge to `release` when ready for operators; that branch publishes `:latest` / `:stable` (see [Pre-built image](#pre-built-image-ghcr)). Cut `v*` git tags from `release` for semver pins.
 
 ### Database migrations
 
