@@ -16,6 +16,7 @@ import {
 } from './api.js'
 import { listenServer } from '../../shared/http-listen.js'
 import { assertSchemaCurrent } from '../../shared/check-schema.js'
+import { envPrefixed } from '../../shared/env.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -30,8 +31,8 @@ try {
 	process.exit(1)
 }
 
-const adminIp = process.env.ADMIN_IP || '0.0.0.0'
-const adminPort = parseInt(process.env.ADMIN_PORT || '8081')
+const adminIp = envPrefixed('RELINKY_ADMIN_IP', 'ADMIN_IP') || '0.0.0.0'
+const adminPort = parseInt(envPrefixed('RELINKY_ADMIN_PORT', 'ADMIN_PORT') || '8081')
 
 const router = new Router()
 

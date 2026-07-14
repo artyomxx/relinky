@@ -2,15 +2,19 @@ import { timingSafeEqual, randomBytes, randomUUID, scryptSync } from 'crypto'
 import { sha512 } from 'sha512-crypt-ts'
 import { getMainDb } from '../../shared/db.js'
 import { ADMIN_PASSWORD_HASH_KEY, envPasswordPresent } from '../../shared/seed-admin-password.js'
+import { envPrefixed } from '../../shared/env.js'
 
 // In-memory session store
 const sessions = new Map()
 
-const sha512Rounds = parseInt(process.env.ADMIN_PASSWORD_SHA512_ROUNDS || '5000', 10)
+const sha512Rounds = parseInt(
+	envPrefixed('RELINKY_ADMIN_PASSWORD_SHA512_ROUNDS', 'ADMIN_PASSWORD_SHA512_ROUNDS') || '5000',
+	10
+)
 
 /** When true, log failed login attempts (never the password). */
 export function isAdminLoginDebug() {
-	const v = process.env.ADMIN_LOGIN_DEBUG
+	const v = envPrefixed('RELINKY_ADMIN_LOGIN_DEBUG', 'ADMIN_LOGIN_DEBUG')
 	return v === '1' || v === 'true' || v === 'yes'
 }
 

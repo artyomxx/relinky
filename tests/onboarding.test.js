@@ -29,9 +29,11 @@ import {
 
 function initDbInDir(dir, { passwordHash = null } = {}) {
 	const env = { ...process.env, RELINKY_DB_DIR: dir }
+	delete env.RELINKY_ADMIN_PASSWORD_HASH
+	delete env.RELINKY_ADMIN_PASSWORD_HASH_B64
 	delete env.ADMIN_PASSWORD_HASH
 	delete env.ADMIN_PASSWORD_HASH_B64
-	if (passwordHash) env.ADMIN_PASSWORD_HASH = passwordHash
+	if (passwordHash) env.RELINKY_ADMIN_PASSWORD_HASH = passwordHash
 	const result = spawnSync('node', ['app/shared/init-db.js'], { cwd: process.cwd(), env, encoding: 'utf8' })
 	assert.equal(result.status, 0, result.stderr)
 }
