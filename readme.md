@@ -11,7 +11,9 @@ Minimal self-hosted link redirector with admin UI, stats, SQLite storage and API
 - Basic stats overview (full stats recording)
 - API for automation with source IP restrictions
 - JSON Import/export in UI
-- Importing from Rebrandly and Kutt 
+- Importing from Rebrandly and Kutt
+- Responsive admin UI for desktop and mobile
+
 
 ### Table of contents
 
@@ -28,7 +30,17 @@ Minimal self-hosted link redirector with admin UI, stats, SQLite storage and API
 
 ## How the admin panel looks
 
-![Relinky Admin UI](./relinky.png)
+<table>
+<tr>
+    <td>Desktop</td>
+    <td>Mobile</td>
+</td>
+<tr>
+    <td><img alt='Desktop Relinky Admin UI' src=./relinky-desktop.png></td>
+    <td><img alt='Mobile Relinky Admin UI' src=./relinky-mobile.png></td>
+</tr>
+</table>
+    
 
 ## Architecture overview
 
