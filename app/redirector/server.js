@@ -12,6 +12,7 @@ import { startWatcher, stopWatcher } from './watcher.js'
 import { getRedirectablesDb } from '../shared/db.js'
 import { listenServer } from '../shared/http-listen.js'
 import { assertSchemaCurrent } from '../shared/check-schema.js'
+import { envPrefixed } from '../shared/env.js'
 
 // Migrations run as a separate deploy step (start.js / gateway entrypoint / compose
 // migrate service). Verify the schema is current and fail fast if it is not.
@@ -23,8 +24,8 @@ try {
 	process.exit(1)
 }
 
-const redirectorIp = process.env.REDIRECTOR_IP || '0.0.0.0'
-const redirectorPort = parseInt(process.env.REDIRECTOR_PORT || '8082')
+const redirectorIp = envPrefixed('RELINKY_REDIRECTOR_IP', 'REDIRECTOR_IP') || '0.0.0.0'
+const redirectorPort = parseInt(envPrefixed('RELINKY_REDIRECTOR_PORT', 'REDIRECTOR_PORT') || '8082')
 
 function getClientIp(req) {
 	return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||

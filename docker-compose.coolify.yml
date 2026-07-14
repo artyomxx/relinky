@@ -27,9 +27,9 @@ services:
       - ./db:/app/db
     environment:
       # Seeded into auth table on every migrator run (overwrites). Coolify can mangle `$`;
-      # use ADMIN_PASSWORD_HASH_B64 if startsWith$6$=false in logs.
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
-      - ADMIN_PASSWORD_HASH_B64=${ADMIN_PASSWORD_HASH_B64:-}
+      # use RELINKY_ADMIN_PASSWORD_HASH_B64 if startsWith$6$=false in logs.
+      - RELINKY_ADMIN_PASSWORD_HASH=${RELINKY_ADMIN_PASSWORD_HASH:-}
+      - RELINKY_ADMIN_PASSWORD_HASH_B64=${RELINKY_ADMIN_PASSWORD_HASH_B64:-}
     entrypoint: ["node", "/app/app/shared/init-db.js"]
     restart: "no"
 
@@ -44,9 +44,9 @@ services:
       relinky_migrate:
         condition: service_completed_successfully
     environment:
-      # Optional: ADMIN_LOGIN_DEBUG=1 in Coolify env — see readme “Configuration”
-      - ADMIN_IP=0.0.0.0
-      - ADMIN_PORT=8081
+      # Optional: RELINKY_ADMIN_LOGIN_DEBUG=1 in Coolify env — see readme “Configuration”
+      - RELINKY_ADMIN_IP=0.0.0.0
+      - RELINKY_ADMIN_PORT=8081
       # Triggers Coolify URL/FQDN generation + proxy routing to 8081 (Git-based compose needs Coolify ≥ beta.411).
       - SERVICE_URL_RELINKY_ADMIN_8081
     entrypoint: ["node", "/app/app/admin/backend/server.js"]
@@ -77,8 +77,8 @@ services:
       relinky_migrate:
         condition: service_completed_successfully
     environment:
-      - REDIRECTOR_IP=0.0.0.0
-      - REDIRECTOR_PORT=8082
+      - RELINKY_REDIRECTOR_IP=0.0.0.0
+      - RELINKY_REDIRECTOR_PORT=8082
       - SERVICE_URL_RELINKY_REDIRECT_8082
     entrypoint: ["node", "/app/app/redirector/server.js"]
     ports:

@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { envPrefixed } from './env.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const appRoot = join(__dirname, '..', '..')
@@ -14,7 +15,7 @@ export function scheduleGatewayReload() {
 
 	const script = join(appRoot, 'scripts', 'generate-caddyfile.mjs')
 	const caddyfile =
-		process.env.CADDYFILE_PATH || join(appRoot, 'caddy', 'Caddyfile')
+		envPrefixed('RELINKY_CADDYFILE_PATH', 'CADDYFILE_PATH') || join(appRoot, 'caddy', 'Caddyfile')
 
 	const child = spawn(
 		'sh',

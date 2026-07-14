@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
+import { envPrefixed } from './app/shared/env.js'
 
-const adminPort = process.env.ADMIN_PORT || '8081'
+const adminPort = envPrefixed('RELINKY_ADMIN_PORT', 'ADMIN_PORT') || '8081'
 
 export default defineConfig({
 	plugins: [vue()],

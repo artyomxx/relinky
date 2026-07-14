@@ -13,6 +13,7 @@ import { writeFileSync, mkdirSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { getRedirectablesDb } from '../app/shared/db.js'
+import { envPrefixed } from '../app/shared/env.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const appRoot = join(__dirname, '..')
@@ -21,12 +22,12 @@ const adminHost = process.env.RELINKY_ADMIN_HOST
 const httpOnly =
 	process.env.RELINKY_HTTP_ONLY === '1' ||
 	process.env.RELINKY_HTTP_ONLY === 'true'
-const acmeEmail = process.env.ACME_EMAIL || ''
+const acmeEmail = envPrefixed('RELINKY_ACME_EMAIL', 'ACME_EMAIL') || ''
 const staging = process.env.RELINKY_ACME_STAGING === '1'
 const caddyfilePath =
-	process.env.CADDYFILE_PATH || join(appRoot, 'caddy', 'Caddyfile')
-const adminPort = process.env.ADMIN_PORT || '8081'
-const redirectPort = process.env.REDIRECTOR_PORT || '8082'
+	envPrefixed('RELINKY_CADDYFILE_PATH', 'CADDYFILE_PATH') || join(appRoot, 'caddy', 'Caddyfile')
+const adminPort = envPrefixed('RELINKY_ADMIN_PORT', 'ADMIN_PORT') || '8081'
+const redirectPort = envPrefixed('RELINKY_REDIRECTOR_PORT', 'REDIRECTOR_PORT') || '8082'
 /** Bind HTTP / HTTPS inside the container (Caddy global http_port / https_port). Defaults 80 / 443. */
 const caddyHttpPort = process.env.RELINKY_CADDY_HTTP_PORT?.trim() || ''
 const caddyHttpsPort = process.env.RELINKY_CADDY_HTTPS_PORT?.trim() || ''

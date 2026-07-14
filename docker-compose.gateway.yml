@@ -2,9 +2,9 @@
 # Domains you add in the UI are merged into the Caddyfile and reloaded automatically.
 #
 # Usage:
-#   export ADMIN_PASSWORD_HASH=...
+#   export RELINKY_ADMIN_PASSWORD_HASH=...
 #   export RELINKY_ADMIN_HOST=admin.example.com
-#   export ACME_EMAIL=you@example.com
+#   export RELINKY_ACME_EMAIL=you@example.com
 #   docker compose -f docker-compose.gateway.yml up -d
 #
 # Local HTTP-only (no TLS): set RELINKY_HTTP_ONLY=1 and map DNS or /etc/hosts to your machine.
@@ -39,17 +39,17 @@ services:
       - ./db:/app/db
     environment:
       # Same as docker-compose.yml: set in .env (single-quoted) or host/Coolify env (paste full $6$…).
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
+      - RELINKY_ADMIN_PASSWORD_HASH=${RELINKY_ADMIN_PASSWORD_HASH:-}
       - RELINKY_USE_GATEWAY=1
       - RELINKY_ADMIN_HOST=${RELINKY_ADMIN_HOST}
-      - ACME_EMAIL=${ACME_EMAIL:-}
+      - RELINKY_ACME_EMAIL=${RELINKY_ACME_EMAIL:-}
       - RELINKY_HTTP_ONLY=${RELINKY_HTTP_ONLY:-0}
       - RELINKY_ACME_STAGING=${RELINKY_ACME_STAGING:-0}
       - RELINKY_CADDY_HTTP_PORT=${RELINKY_CADDY_HTTP_PORT:-}
       - RELINKY_CADDY_HTTPS_PORT=${RELINKY_CADDY_HTTPS_PORT:-}
       - RELINKY_CADDY_TLS_INTERNAL=${RELINKY_CADDY_TLS_INTERNAL:-0}
-      - ADMIN_PORT=8081
-      - REDIRECTOR_PORT=8082
+      - RELINKY_ADMIN_PORT=8081
+      - RELINKY_REDIRECTOR_PORT=8082
     healthcheck:
       test:
         [

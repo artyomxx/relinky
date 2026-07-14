@@ -192,18 +192,18 @@ Script pointers for this flow:
 Required environment variables:
 
 - `RELINKY_ADMIN_HOST` (required)
-- `ACME_EMAIL` (recommended for real HTTPS)
+- `RELINKY_ACME_EMAIL` (recommended for real HTTPS)
 
 Optional:
 
-- `ADMIN_PASSWORD_HASH` or `ADMIN_PASSWORD_HASH_B64` — if set, seeded into the DB on startup instead of using onboarding.
+- `RELINKY_ADMIN_PASSWORD_HASH` or `RELINKY_ADMIN_PASSWORD_HASH_B64` — if set, seeded into the DB on startup instead of using onboarding.
 
 Start:
 
 ```bash
 export RELINKY_ADMIN_HOST='admin.example.com'
-export ACME_EMAIL='you@example.com'
-# optional: export ADMIN_PASSWORD_HASH='...'
+export RELINKY_ACME_EMAIL='you@example.com'
+# optional: export RELINKY_ADMIN_PASSWORD_HASH='...'
 docker compose -f docker-compose.gateway.yml up -d --build
 ```
 
@@ -254,7 +254,7 @@ Checklist:
 
 1. Create an app from a public Github repo or your private cloned one
 2. Build pack: Docker Compose, file [`docker-compose.coolify.yml`](./docker-compose.coolify.yml). Note that by default Coolify offers `.yaml` extension, so change the whole file name.
-3. Optional: set `ADMIN_PASSWORD_HASH_B64` on the **relinky_migrate** service (Base64-encoded hash). Coolify often mangles `$` in env vars — use B64 if login fails after deploy. If unset, complete onboarding on first admin visit instead.
+3. Optional: set `RELINKY_ADMIN_PASSWORD_HASH_B64` on the **relinky_migrate** service (Base64-encoded hash). Coolify often mangles `$` in env vars — use B64 if login fails after deploy. If unset, complete onboarding on first admin visit instead.
 4. Ensure the persistent storage for `./db` is attached to both services (should happen automatically)
 5. Setup admin and redirect domains in Coolify and the admin UI:
    - Admin service: one admin hostname, for example `https://admin.example.com:8081`
@@ -286,7 +286,7 @@ If your platform mangles `$` values:
 npm run hash-password -- 'your-password' --b64
 ```
 
-Then set `ADMIN_PASSWORD_HASH` or `ADMIN_PASSWORD_HASH_B64`. On every startup the migrator **copies this hash into the database** (overwriting any in-app password change). Remove the env var to manage the password only from the admin UI (**Tools → Password**).
+Then set `RELINKY_ADMIN_PASSWORD_HASH` or `RELINKY_ADMIN_PASSWORD_HASH_B64`. On every startup the migrator **copies this hash into the database** (overwriting any in-app password change). Remove the env var to manage the password only from the admin UI (**Tools → Password**).
 
 If neither env nor onboarding has run yet, the admin UI stays on onboarding until a password is set.
 
@@ -359,23 +359,25 @@ curl -sS -X POST "$BASE/api/external/links" \
 
 ## Configuration Reference
 
-Check [`.env.example`](./.env.example) file
+Check [`.env.example`](./.env.example) file.
+
+All Relinky settings use a `RELINKY_` prefix. Older unprefixed names (`ADMIN_PASSWORD_HASH`, `ADMIN_PORT`, `ACME_EMAIL`, …) still work if the new name is unset; Relinky logs a one-time deprecation warning and will remove those aliases later — rename when you can.
 
 ### Common (all modes)
 
 Optional (seeds the DB password on every migrator run; omit to use onboarding or **Tools → Password**):
 
-- `ADMIN_PASSWORD_HASH` — Raw sha512-crypt admin password hash (`$6$...`). Copied into the `auth` table on startup (overwrites). Login always checks the database, not env directly.
-- `ADMIN_PASSWORD_HASH_B64` — Base64 form of the same hash; use when your platform mangles `$` characters (e.g. Coolify).
+- `RELINKY_ADMIN_PASSWORD_HASH` — Raw sha512-crypt admin password hash (`$6$...`). Copied into the `auth` table on startup (overwrites). Login always checks the database, not env directly.
+- `RELINKY_ADMIN_PASSWORD_HASH_B64` — Base64 form of the same hash; use when your platform mangles `$` characters (e.g. Coolify).
 
 Optional:
 
-- `ADMIN_LOGIN_DEBUG` — Enables verbose admin login diagnostics in logs (`1`, `true`, `yes`).
-- `ADMIN_PASSWORD_SHA512_ROUNDS` — Hash rounds used by the local hash-generation script.
-- `ADMIN_IP` — Bind address for admin HTTP server.
-- `ADMIN_PORT` (default `8081`) — Listen port for admin HTTP server.
-- `REDIRECTOR_IP` — Bind address for redirector HTTP server.
-- `REDIRECTOR_PORT` (default `8082`) — Listen port for redirector HTTP server.
+- `RELINKY_ADMIN_LOGIN_DEBUG` — Enables verbose admin login diagnostics in logs (`1`, `true`, `yes`).
+- `RELINKY_ADMIN_PASSWORD_SHA512_ROUNDS` — Hash rounds used by the local hash-generation script.
+- `RELINKY_ADMIN_IP` — Bind address for admin HTTP server.
+- `RELINKY_ADMIN_PORT` (default `8081`) — Listen port for admin HTTP server.
+- `RELINKY_REDIRECTOR_IP` — Bind address for redirector HTTP server.
+- `RELINKY_REDIRECTOR_PORT` (default `8082`) — Listen port for redirector HTTP server.
 - `RELINKY_DB_DIR` — Override the SQLite database directory (defaults to the repo-local `db/`). Useful for isolated test runs or non-standard layouts; in Docker the `db/` volume is the persistent location.
 - `RELINKY_DB_BUSY_TIMEOUT_MS` (default `5000`) — How long a SQLite connection waits for a busy database lock before erroring. The admin and redirector both run migrations on boot, so this lets the second writer wait instead of failing with `SQLITE_BUSY`.
 - `RELINKY_DB_BACKUP_KEEP` (default `10`, `0` = keep all) — How many pre-migration backups to retain per database in `db/backups/`. Older snapshots beyond this count are pruned automatically.
@@ -388,7 +390,7 @@ Required:
 
 Recommended (production HTTPS):
 
-- `ACME_EMAIL` — Contact email used by Caddy/ACME for [Let's Encrypt](https://en.wikipedia.org/wiki/Let%27s_Encrypt) registration.
+- `RELINKY_ACME_EMAIL` — Contact email used by Caddy/ACME for [Let's Encrypt](https://en.wikipedia.org/wiki/Let%27s_Encrypt) registration.
 
 Optional:
 
@@ -399,14 +401,14 @@ Optional:
 - `RELINKY_GATEWAY_HOST_HTTP` — Host port published to `RELINKY_CADDY_HTTP_PORT`.
 - `RELINKY_GATEWAY_HOST_HTTPS` — Host port published to `RELINKY_CADDY_HTTPS_PORT`.
 - `RELINKY_CADDY_TLS_INTERNAL` — Use Caddy internal CA/self-signed certs instead of ACME certs.
-- `CADDYFILE_PATH` (default `/app/caddy/Caddyfile`) — Filesystem path where generated Caddyfile is written/read.
+- `RELINKY_CADDYFILE_PATH` (default `/app/caddy/Caddyfile`) — Filesystem path where generated Caddyfile is written/read.
 
 ### Coolify mode only ([`docker-compose.coolify.yml`](./docker-compose.coolify.yml))
 
 Required:
 
-- `ADMIN_PASSWORD_HASH_B64` — Base64-encoded password hash.
-  Don't use the normal `ADMIN_PASSWORD_HASH` with Coolify! It mangles `$` symbols in env variables as of April 2026.
+- `RELINKY_ADMIN_PASSWORD_HASH_B64` — Base64-encoded password hash.
+  Don't use the normal `RELINKY_ADMIN_PASSWORD_HASH` with Coolify! It mangles `$` symbols in env variables as of April 2026.
 
 ---
 
@@ -420,7 +422,7 @@ npm run dev
 npm run test:spec
 ```
 
-`npm run dev` runs migrations/seed once (`dev:prepare`), then watches `app/admin/backend/server.js` and `app/redirector/server.js` (plus Vite). Do **not** watch `start-dev.js` / `start.js` — Node's supervisor + `--watch` + spawned children loops on macOS. `dev:backend` (no watch) still uses `start-dev.js` if you only need the API processes. Loads [`.env`](./.env) via `--env-file-if-exists`. For normal local work, uncomment the dev `ADMIN_PASSWORD_HASH` in `.env` (password `dev`). To test onboarding, leave it unset and start with an empty `db/` directory.
+`npm run dev` runs migrations/seed once (`dev:prepare`), then watches `app/admin/backend/server.js` and `app/redirector/server.js` (plus Vite). Do **not** watch `start-dev.js` / `start.js` — Node's supervisor + `--watch` + spawned children loops on macOS. `dev:backend` (no watch) still uses `start-dev.js` if you only need the API processes. Loads [`.env`](./.env) via `--env-file-if-exists`. For normal local work, uncomment the dev `RELINKY_ADMIN_PASSWORD_HASH` in `.env` (password `dev`). To test onboarding, leave it unset and start with an empty `db/` directory.
 
 **Branches:** `main` is the active development line (GHCR `:dev`). Merge to `release` when ready for operators; that branch publishes `:latest` / `:stable` (see [Pre-built image](#pre-built-image-ghcr)). Cut `v*` git tags from `release` for semver pins.
 

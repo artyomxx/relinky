@@ -10,6 +10,12 @@ import { ADMIN_PASSWORD_HASH_KEY } from '../app/shared/seed-admin-password.js'
 
 /** Env keys that must not leak from shell / .env into spawned test servers */
 const BIND_ENV_KEYS = [
+	'RELINKY_ADMIN_IP',
+	'RELINKY_ADMIN_PORT',
+	'RELINKY_REDIRECTOR_IP',
+	'RELINKY_REDIRECTOR_PORT',
+	'RELINKY_ADMIN_PASSWORD_HASH',
+	'RELINKY_ADMIN_PASSWORD_HASH_B64',
 	'ADMIN_IP',
 	'ADMIN_PORT',
 	'REDIRECTOR_IP',
@@ -31,7 +37,7 @@ function runInitDb(dir, { passwordHash = devPasswordHash } = {}) {
 	const env = scrubBindEnv(process.env)
 	env.RELINKY_DB_DIR = dir
 	if (passwordHash) {
-		env.ADMIN_PASSWORD_HASH = passwordHash
+		env.RELINKY_ADMIN_PASSWORD_HASH = passwordHash
 	}
 	const result = spawnSync('node', ['app/shared/init-db.js'], {
 		cwd: process.cwd(),
@@ -135,15 +141,15 @@ export function buildTestEnvForDb(dir, overrides = {}) {
 
 export function buildAdminTestEnv(port, dbDir = testDbDir) {
 	return buildTestEnvForDb(dbDir, {
-		ADMIN_IP: adminListenHost,
-		ADMIN_PORT: String(port)
+		RELINKY_ADMIN_IP: adminListenHost,
+		RELINKY_ADMIN_PORT: String(port)
 	})
 }
 
 export function buildRedirectorTestEnv(port, dbDir = testDbDir) {
 	return buildTestEnvForDb(dbDir, {
-		REDIRECTOR_IP: adminListenHost,
-		REDIRECTOR_PORT: String(port)
+		RELINKY_REDIRECTOR_IP: adminListenHost,
+		RELINKY_REDIRECTOR_PORT: String(port)
 	})
 }
 
