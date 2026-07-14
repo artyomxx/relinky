@@ -43,8 +43,8 @@ Allows for human-friendly redirects on your own domains — e.g. `go.example.com
     <td>Mobile</td>
 </td>
 <tr>
-    <td><img alt='Desktop Relinky Admin UI' src=./relinky-desktop.png></td>
-    <td><img alt='Mobile Relinky Admin UI' src=./relinky-mobile.png></td>
+    <td><img alt='Desktop Relinky Admin UI' src=./relinky-desktop.png height=350></td>
+    <td><img alt='Mobile Relinky Admin UI' src=./relinky-mobile.png height=350></td>
 </tr>
 </table>
     
