@@ -14,6 +14,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY app/admin/frontend/ ./app/admin/frontend/
+COPY app/shared/env.js ./app/shared/env.js
 COPY vite.config.js ./
 RUN npm run build
 
