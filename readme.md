@@ -1,6 +1,8 @@
 # Relinky
 
-Minimal self-hosted link redirector with admin UI, stats, SQLite storage and API for automation
+Lightweight self-hosted link redirector/shortener with admin UI, stats, SQLite storage and API for automation.
+
+Allows for human-friendly redirects on your own domains — e.g. `go.example.com/docs` — that you can retarget later without updating it everywhere. Helps with branding links for marketing pipelines and just if you like human-friendly links and have a domain of your own.
 
 ### Features
 
@@ -18,15 +20,20 @@ Minimal self-hosted link redirector with admin UI, stats, SQLite storage and API
 ### Table of contents
 
 - [Architecture overview](#architecture-overview)
+- [Setup](#setup)
 - [Pre-built image (GHCR)](#pre-built-image-ghcr)
 - [Hosting modes](#hosting-modes)
   - [1. Plain Docker](#mode-1-plain-docker-docker-composeyml)
   - [2. Gateway, embedded Caddy](#mode-2-gateway-embedded-caddy-docker-composegatewayyml)
   - [3. Coolify](#mode-3-coolify--traefik-docker-composecoolifyyml)
+- [Domains: global and per-domain defaults](#domains-global-and-per-domain-defaults)
+- [External Automation API](#external-automation-api)
+- [Configuration Reference](#configuration-reference)
 - [Development](#development)
 - [Future plans](#future-plans)
-- [Support](#support)
+- [Support](.github/SUPPORT.md)
 - [MIT License](#mit-license)
+
 
 ## How the admin panel looks
 
@@ -69,44 +76,65 @@ Databases:
 
 ---
 
+## Setup
+
+Same overall path regardless of how you host:
+
+1. **Choose a hosting mode** — [Plain Docker](#mode-1-plain-docker-docker-composeyml) if you already have a front-end proxy; [Gateway](#mode-2-gateway-embedded-caddy-docker-composegatewayyml) if Relinky should run Caddy and get certificates itself; [Coolify](#mode-3-coolify--traefik-docker-composecoolifyyml) if you use it either as a service or self-hosted.
+2. **Run Relinky** — pull a [pre-built image](#pre-built-image-ghcr) or build from the compose file. Commands for each option are in the mode sections below.
+3. **Keep `db/` persistent** — all SQLite files live there; mount/keep that directory across upgrades.
+4. **DNS** — point admin and redirect domains to your Relinky instance server and set up domain routing on your server so the requests reach Relinky services. You need at least two domains — for admin UI and for redirects, it can't be the same domain. For example, `links.com` for both — won't work; `admin.links.com` and `links.com` will work fine as well as `relinky.company.com` for admin UI and `go.company.com` for links.
+5. **Admin password** — you'll set it during onboarding on first visit. You can also seed a hash via env before start (see below).
+6. **Add links** — in the admin UI under **Links** (also the main page).
+7. **Import old links** — upload your JSONs or CSVs in **Tools**, there's pre-check before actual import so you know precisely what will happen.
+8. **Have fund and grow** — you can add more domains under **Domains** and API keys under **Tools** if you automate. Don't forget to point your new domains to the server and configure the server itself so it knows that these domains should be routed to Relinky.
+
+### Admin password
+
+On first visit, if no password exists in the database, Relinky shows **onboarding**: set a password and your first redirect domain. When the password is set normal login page is shown.
+
+To pre-seed a password instead, generate the hash:
+
+```bash
+npm run hash-password -- 'your-password'
+```
+
+Or:
+
+```bash
+openssl passwd -6 'your-password'
+```
+
+If the platform mangles `$` in env values (Coolify does):
+
+```bash
+npm run hash-password -- 'your-password' --b64
+```
+
+Then set `RELINKY_ADMIN_PASSWORD_HASH` or `RELINKY_ADMIN_PASSWORD_HASH_B64`. On every startup the migrator **copies this hash into the database** (overwriting any in-app password change). Remove the env var to manage the password only from the admin UI (**Tools → Password**).
+
+If neither env nor onboarding has run yet, the admin UI stays on onboarding until a password is set.
+
+---
+
 ## Pre-built image (GHCR)
 
-Multi-arch images (`linux/amd64`, `linux/arm64`) are published to [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+Multi-arch images (`linux/amd64`, `linux/arm64`) are published to [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry) as `ghcr.io/artyomxx/relinky`.
 
-### Branches and tags
+| Git ref | Role | Image tags |
+|---------|------|------------|
+| `main` | Development | `dev`, `main`, `main-<sha>` |
+| `release` | Stable line | `latest`, `stable`, `release`, `release-<sha>` |
+| `v1.2.3` (git tag) | Pinned release | `1.2.3`, `1.2`, `1`, `latest`, `stable`, `<sha>` |
 
-| Git ref | Role | Image tags | Who should use it |
-|---------|------|------------|-------------------|
-| `main` | Development | `dev`, `main`, `main-<sha>` | Early testers, your own staging |
-| `release` | Stable line | `latest`, `stable`, `release`, `release-<sha>` | Production self-hosting, PaaS recipes |
-| `v1.2.3` (git tag) | Pinned release | `1.2.3`, `1.2`, `1`, `latest`, `stable`, `<sha>` | Pin a specific version |
-
-**Default for operators:** `ghcr.io/artyomxx/relinky:latest` (tracks `release` and version tags).
-
-**Try in-development builds:** `ghcr.io/artyomxx/relinky:dev` (tracks `main`).
-
-Pull:
+Prefer `:latest` / `:stable` for production. Use `:dev` to try what’s on `main`. Pin a semver tag when you want a fixed build.
 
 ```bash
-docker pull ghcr.io/artyomxx/relinky:latest   # stable
-docker pull ghcr.io/artyomxx/relinky:dev      # pre-release
+docker pull ghcr.io/artyomxx/relinky:latest
+docker pull ghcr.io/artyomxx/relinky:dev
 ```
 
-Run with a pre-built image — set `RELINKY_IMAGE`, pull, then start without building:
-
-```bash
-export RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest
-docker compose pull && docker compose up -d --no-build
-```
-
-Gateway mode: add `-f docker-compose.gateway.yml`. Pin a version or channel:
-
-```bash
-RELINKY_IMAGE=ghcr.io/artyomxx/relinky:dev docker compose pull
-RELINKY_IMAGE=ghcr.io/artyomxx/relinky:1.0.0 docker compose -f docker-compose.gateway.yml up -d --no-build
-```
-
-Local build from source (default tag `relinky:local`): `docker compose up -d --build`
+Compose picks the image from `RELINKY_IMAGE` (defaults to a local `relinky:local` build). How to pass that into each deploy style is under [Hosting modes](#hosting-modes).
 
 ---
 
@@ -133,13 +161,21 @@ Use when:
 - You already have your own reverse proxy/TLS setup
 - Or local/dev usage where you do not need automatic TLS
 
-Start:
+Build from source:
 
 ```bash
 docker compose up -d --build
 ```
 
-Pre-built image: set `RELINKY_IMAGE` (see [Pre-built image](#pre-built-image-ghcr)).
+Or run a pre-built image (no local build):
+
+```bash
+export RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest
+docker compose pull
+docker compose up -d --no-build
+```
+
+Admin listens on port `8081`, redirector on `8082` (or whatever you set in env). Point your proxy to these ports (at least the admin domain), open the admin domain, complete onboarding and you're good to go.
 
 ### Mode 2: Gateway, embedded [Caddy](https://github.com/caddyserver/caddy) ([`docker-compose.gateway.yml`](./docker-compose.gateway.yml))
 
@@ -203,14 +239,10 @@ Script pointers for this flow:
 
 Required environment variables:
 
-- `RELINKY_ADMIN_HOST` (required)
-- `RELINKY_ACME_EMAIL` (recommended for real HTTPS)
+- `RELINKY_ADMIN_HOST`
+- `RELINKY_ACME_EMAIL`
 
-Optional:
-
-- `RELINKY_ADMIN_PASSWORD_HASH` or `RELINKY_ADMIN_PASSWORD_HASH_B64` — if set, seeded into the DB on startup instead of using onboarding.
-
-Start:
+Build from source:
 
 ```bash
 export RELINKY_ADMIN_HOST='admin.example.com'
@@ -219,14 +251,22 @@ export RELINKY_ACME_EMAIL='you@example.com'
 docker compose -f docker-compose.gateway.yml up -d --build
 ```
 
-Pre-built image: `RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest docker compose -f docker-compose.gateway.yml pull && … up -d --no-build` (see [Pre-built image](#pre-built-image-ghcr)).
+Or a pre-built image:
+
+```bash
+export RELINKY_IMAGE=ghcr.io/artyomxx/relinky:latest
+export RELINKY_ADMIN_HOST='admin.example.com'
+export RELINKY_ACME_EMAIL='you@example.com'
+docker compose -f docker-compose.gateway.yml pull
+docker compose -f docker-compose.gateway.yml up -d --no-build
+```
 
 After startup:
 
-1. Open `https://admin.example.com`
+1. Go to your admin domain
 2. Complete onboarding (first visit) or log in if a password was seeded
-3. Add redirect domains in **Domains**
-4. Ensure those domains resolve to the same server
+3. Optionally add more redirect domains in **Domains**
+4. Ensure all domains resolve to the same server
 5. Relinky regenerates Caddy config and reloads Caddy automatically
 
 Port/cert notes:
@@ -240,7 +280,7 @@ Port/cert notes:
 
 Use when:
 
-- Coolify/Traefik already terminates TLS and owns host `80/443`
+- You use Coolify as a service or self-hosted
 
 Do not use gateway mode here unless you intentionally want double proxy.
 
@@ -264,43 +304,14 @@ flowchart LR
 
 Checklist:
 
-1. Create an app from a public Github repo or your private cloned one
-2. Build pack: Docker Compose, file [`docker-compose.coolify.yml`](./docker-compose.coolify.yml). Note that by default Coolify offers `.yaml` extension, so change the whole file name.
-3. Optional: set `RELINKY_ADMIN_PASSWORD_HASH_B64` on the **relinky_migrate** service (Base64-encoded hash). Coolify often mangles `$` in env vars — use B64 if login fails after deploy. If unset, complete onboarding on first admin visit instead.
-4. Ensure the persistent storage for `./db` is attached to both services (should happen automatically)
-5. Setup admin and redirect domains in Coolify and the admin UI:
-   - Admin service: one admin hostname, for example `https://admin.example.com:8081`
-   - Redirect service: one or many redirect hostnames, for example `https://link.example.com:8082, https://dl.example.com:8082`
-   - In the panel, add redirect hostnames under **Domains**
-   - Important: keep in mind Coolify expects full links with protocols and ports like shown above, don't enter only domains.
-
----
-
-## Authentication Setup
-
-On first visit, if no admin password exists in the database, Relinky shows an **onboarding** screen where you set a password and your first redirect domain. After that, use the normal login page.
-
-You can also pre-set a password before first visit:
-
-```bash
-npm run hash-password -- 'your-password'
-```
-
-Alternative:
-
-```bash
-openssl passwd -6 'your-password'
-```
-
-If your platform mangles `$` values:
-
-```bash
-npm run hash-password -- 'your-password' --b64
-```
-
-Then set `RELINKY_ADMIN_PASSWORD_HASH` or `RELINKY_ADMIN_PASSWORD_HASH_B64`. On every startup the migrator **copies this hash into the database** (overwriting any in-app password change). Remove the env var to manage the password only from the admin UI (**Tools → Password**).
-
-If neither env nor onboarding has run yet, the admin UI stays on onboarding until a password is set.
+1. Create an app from a public Github repo or your private clone.
+2. Build pack: Docker Compose, file [`docker-compose.coolify.yml`](./docker-compose.coolify.yml). Coolify often defaults to `.yaml` — rename or point it at this `.yml` file.
+3. Ensure persistent storage for `./db` is attached to the migrate/admin/redirect services (usually automatic).
+4. Set admin and redirect domains in Coolify and in Relinky:
+   - Admin service: one admin hostname, e.g. `https://admin.example.com:8081`
+   - Redirect service: one or many redirect hostnames, e.g. `https://link.example.com:8082, https://dl.example.com:8082`
+   - Coolify expects full URLs with protocol (e.g. `https://`) and port (e.g. `:8081`) as above, not bare domains.
+5. Deploy the project, open your admin domain (e.g. `admin.example.com`) in browser and complete onboarding: set password and add first redirect domain. More domains may be added under **Domains** when you log in after onboarding.
 
 ---
 
@@ -399,9 +410,6 @@ Optional:
 Required:
 
 - `RELINKY_ADMIN_HOST` — Public hostname for the admin UI.
-
-Recommended (production HTTPS):
-
 - `RELINKY_ACME_EMAIL` — Contact email used by Caddy/ACME for [Let's Encrypt](https://en.wikipedia.org/wiki/Let%27s_Encrypt) registration.
 
 Optional:
@@ -409,7 +417,7 @@ Optional:
 - `RELINKY_HTTP_ONLY` — Force HTTP-only mode (no TLS/cert issuance).
 - `RELINKY_ACME_STAGING` — Use Let's Encrypt staging endpoint (safe for testing rate limits).
 - `RELINKY_CADDY_HTTP_PORT` — Internal container HTTP port where Caddy listens.
-- `RELINKY_CADDY_HTTPS_PORT` —Internal container HTTPS port where Caddy listens.
+- `RELINKY_CADDY_HTTPS_PORT` — Internal container HTTPS port where Caddy listens.
 - `RELINKY_GATEWAY_HOST_HTTP` — Host port published to `RELINKY_CADDY_HTTP_PORT`.
 - `RELINKY_GATEWAY_HOST_HTTPS` — Host port published to `RELINKY_CADDY_HTTPS_PORT`.
 - `RELINKY_CADDY_TLS_INTERNAL` — Use Caddy internal CA/self-signed certs instead of ACME certs.
@@ -417,7 +425,7 @@ Optional:
 
 ### Coolify mode only ([`docker-compose.coolify.yml`](./docker-compose.coolify.yml))
 
-Required:
+Optional (pre-seed or reset password from env):
 
 - `RELINKY_ADMIN_PASSWORD_HASH_B64` — Base64-encoded password hash.
   Don't use the normal `RELINKY_ADMIN_PASSWORD_HASH` with Coolify! It mangles `$` symbols in env variables as of April 2026.
@@ -436,8 +444,6 @@ npm run test:spec
 
 `npm run dev` runs migrations/seed once (`dev:prepare`), then watches `app/admin/backend/server.js` and `app/redirector/server.js` (plus Vite). Do **not** watch `start-dev.js` / `start.js` — Node's supervisor + `--watch` + spawned children loops on macOS. `dev:backend` (no watch) still uses `start-dev.js` if you only need the API processes. Loads [`.env`](./.env) via `--env-file-if-exists`. For normal local work, uncomment the dev `RELINKY_ADMIN_PASSWORD_HASH` in `.env` (password `dev`). To test onboarding, leave it unset and start with an empty `db/` directory.
 
-**Branches:** `main` is the active development line (GHCR `:dev`). Merge to `release` when ready for operators; that branch publishes `:latest` / `:stable` (see [Pre-built image](#pre-built-image-ghcr)). Cut `v*` git tags from `release` for semver pins.
-
 ### Database migrations
 
 Schema changes are applied automatically — no manual step. Each SQLite file tracks its own version (`PRAGMA user_version`) and only the missing migrations run, inside a transaction, so existing databases upgrade in place without data loss. Migrations live in [`app/shared/migrations/`](./app/shared/migrations) and are run by [`app/shared/init-db.js`](./app/shared/init-db.js); to add one, append it to the relevant file's list.
@@ -454,22 +460,15 @@ After switching Node versions, rebuild the native SQLite binding: `npm rebuild b
 
 ## Future plans
 
-1. There's a lot of meta information recorded when links are redirected, all very useful for good stats and analytics. At the same time the stats view is still in its most basic form yet. That's what I wanted to focus on in the nearest future.
-2. It's being used in sorta 'production environment' by myself for my own personal needs, and works well, but I can't guarantee it'll work well under very heavy load, though why not — it's very simple. That's something I'd love to see some feedback on and potentially improve if needed. For example, a *blazing fast* front-end router could be introduced, as well as the redirector could be rewritten with something more efficient than JS. In any case I want to keep it simple, because we all know what happens to overcomplicated and overengineered software products.
+1. There's a lot of meta information recorded when links are redirected, all very useful for good stats and analytics. At the same time the stats view is still in its most basic form yet.
+2. It's being used in 'production' by myself for my own personal needs, and works well, but I can't guarantee it'll work well under very heavy load, though why not — it's very simple. That's something I'd love to see some feedback on and potentially improve if needed. For example, a *blazing fast* front-end router could be introduced, as well as the redirector could be rewritten with something more efficient than JS.
 3. The rest depends on feedback.
 
 ---
 
 ## Support
 
-1. Feedback or even a worthy pull-request is priceless!
-2. If you use it and it helps you with your business or personal needs, I wouldn't say no to donations:
-   - DOGE: `D5x6svhkv63EebUSwL7DCgp1CHdX2pu1Js`
-   - BTC: `bc1qslefa243svmdnph6s53fj6u9l4aj8juhf2wrce`
-   - ETH: `0x87EdCDfD97Bd6F7D1ec2764081cd37E64127E7e9`
-   - USDT: `0x87EdCDfD97Bd6F7D1ec2764081cd37E64127E7e9` (ETH), `TPRxb7XYM2szKUNgv2jNugrZ4WMYgLULPc` (TRX)
-   - Non-crypto with my music in exchange: [Alvisk](https://alvisk.bandcamp.com), [Veell](https://veell.bandcamp.com), [Chaoskeeper](https://chaoskeeper.bandcamp.com) @ Bandcamp
-   - Anything else? [Get in touch](https://artyom.cc).
+See [`.github/SUPPORT.md`](.github/SUPPORT.md) (donations) or [get in touch](https://artyom.cc).
 
 ---
 

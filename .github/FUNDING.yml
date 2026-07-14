@@ -1,0 +1,6 @@
+# Sponsor button — GitHub has no native crypto fields.
+# Details (wallets, Bandcamp, contact): see SUPPORT.md
+# Up to 4 custom https URLs.
+custom:
+  - 'https://github.com/artyomxx/relinky/blob/main/.github/SUPPORT.md'
+  - 'https://artyom.cc'
